@@ -4,7 +4,7 @@
   <title><![CDATA[Category: Java | CRO-成都学习天地]]></title>
   <link href="http://crochengdu.github.io/blog/categories/java/atom.xml" rel="self"/>
   <link href="http://crochengdu.github.io/"/>
-  <updated>2014-06-09T12:54:59+08:00</updated>
+  <updated>2014-06-09T13:20:19+08:00</updated>
   <id>http://crochengdu.github.io/</id>
   <author>
     <name><![CDATA[运营支撑团队]]></name>
@@ -418,6 +418,463 @@ JVM并不需要为此机制作出改动。编译器通过内联函数和扩展�
 可以这么理解finally，有异常发生的时候，可以理解为一个可以捕获方法内任何异常（包含try块中的异常和catch块中的异常）并自动重新抛出的catch段。
 在没有异常，或者异常被捕获的过程，以字节码内联的方式将finally段内容自动添加到对应的段后，然后自动执行。
 注意：如果finally段内如果有return关键字的话，异常已经被捕获，在再次抛出之前，return导致了Frame的出栈，从而导致后面的(athrow)没有执行，JVM的异常状态神奇的消失了。所以在代码实现上面，一定要避免这种有违异常约定的写法（eclipse也会提醒）。</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[关于Java集合的那些事儿]]></title>
+    <link href="http://crochengdu.github.io/blog/2014/06/09/java-collection/"/>
+    <updated>2014-06-09T10:32:40+08:00</updated>
+    <id>http://crochengdu.github.io/blog/2014/06/09/java-collection</id>
+    <content type="html"><![CDATA[<h1>一、集合的体系结构</h1>
+
+<p><img class="center" src="/images/collection.png" width="380" height="320"></p>
+
+<p>Collection是集合的基类，List和Set均继承自该类。在使用上，List：有序(元素存入集合的顺序和取出的顺序一致)，元素都有索引，元素可以重复，而Set中元素要保证不能重复。Map集合存储和Collection有着很大不同：
+(1)Collection一次存一个元素；Map一次存一对元素。</p>
+
+<p>(2)Collection是单列集合；Map是双列集合。</p>
+
+<p>(3)Map中的存储的一对元素：一个是键，一个是值，键与值之间有对应(映射)关系。</p>
+
+<h1>二、Set和Map的关系，以及Map和List的关系</h1>
+
+<p>以HashMap为例，k-v键值对以Entry的方式存入了它的数据成员table，这个table我们可以认为它就是一个Set，因为这个table中的元素是彼此不相等；
+反过来说，Set中的元素有一个索引与之对应，所以从这个角度看Set也是Map，而且我们可以从HashSet的实现看到，HashSet其实是通过HashMap来实现的；
+Map和List的关系，与Map和Set的关系类似。</p>
+
+<h1>三、ArrayList</h1>
+
+<p>(1)使用场景</p>
+
+<p>继承自List，内用Object[]数组存放数据，封装对数组的操作，动态扩容，频繁的增（超出capacity则需要System.arraycopy，指定插入位置必执行System.arraycopy）删（每次删除都要System.arraycopy）影响性能，查询优势。当你需要一个数据结构存储数据，少增删多查询，可以使用ArrayList。</p>
+
+<p>(2)源码解读</p>
+
+<p>ArrayList的add/remove/subList代码解读：
+```java
+public boolean add(E e) {
+/*内部方法，计数并判断是否需要扩容
+如果elementData已满，增加其大小至elementData.length + DEFAULT_CAPACITY</p>
+
+<pre><code>    */
+    ensureCapacityInternal(size + 1);
+</code></pre>
+
+<p>elementData[size++] = e;</p>
+
+<pre><code>//永远返回true，对于错误情况总是抛出异常
+    return true;
+}
+</code></pre>
+
+<p>删除：
+public E remove(int index) {</p>
+
+<pre><code>//如果传入的index大于elementData存储总数，抛IndexOutOfBoundsException
+    rangeCheck(index);
+//修改记录数，为做同步检查
+    modCount++;
+    E oldValue = elementData(index);
+//需要移动的数量。影响的是index之后的所有数据
+    int numMoved = size - index - 1;
+//如果移除的是最后一位，就没有必要重新拷贝。
+    if (numMoved &gt; 0)
+        System.arraycopy(elementData, index+1, elementData, index,numMoved);
+//把多余的最后一位清空，GC会回收
+    elementData[--size] = null;
+    return oldValue;
+</code></pre>
+
+<p>}</p>
+
+<p>SubList（代码比较长，摘取部分）
+  //constructor
+SubList(AbstractList<E> parent,</p>
+
+<pre><code>            int offset, int fromIndex, int toIndex) {
+  this.parent = parent; //将当前arraylist以参数形式传给subList
+  this.parentOffset = fromIndex;
+  this.offset = offset + fromIndex;
+  this.size = toIndex - fromIndex; //记录sublist的size，与parent分开处理
+  this.modCount = ArrayList.this.modCount; //防控并发修改
+</code></pre>
+
+<p>}
+public E set(int index, E e) {</p>
+
+<pre><code>  rangeCheck(index); //sublist自身的方法，将index与sublist的size做比较
+  checkForComodification(); //只检查了ModCount，没有变更。Set不是结构性变更，所以不用更改modCount。
+  E oldValue = ArrayList.this.elementData(offset + index);
+  ArrayList.this.elementData[offset + index] = e; //直接修改父类的数据
+  return oldValue;
+</code></pre>
+
+<p>}
+//对于sublist的add方法，必须指定index
+  public void add(int index, E e) {</p>
+
+<pre><code>    rangeCheckForAdd(index);
+    checkForComodification();
+    parent.add(parentOffset + index, e);//调用parent对象的add方法完成此操作,因此父类数据也会被修改。
+    this.modCount = parent.modCount;//add是结构性的更变，需要修改modCount。
+    this.size++;
+}
+</code></pre>
+
+<p>```
+初始capacity为10, 视应用情况使用ensureCapacity为数组扩容，减少System.arraycopy的次数。</p>
+
+<h1>四、HashMap</h1>
+
+<p>HashMap是线程不安全的
+HashTable是线程安全的，但是粒度很大
+ConcurrentHashMap, 线程安全，粒度比较小
+利用segment缩小锁的范围</p>
+
+<p>(1)、从HashMap的结构可以看出，HashMap的设计初衷是想结合链表和线性表的优势而达到较平衡的查询、添加和删除性能。</p>
+
+<p>(2)、源码分析</p>
+
+<p>Hash方法中，hashcode 的高位参加 hash计算，这样计算出来的hash值可以最大限度的体现对象之间的差异，目的是将对象放在不同的数组位置上。</p>
+
+<p>Index方法中，对hash取模操作，这里的magic是length的长度是2的幂数，length-1后二进制都是01111…1, 从而可以快速取模。
+```java
+static int hash(int h) {</p>
+
+<pre><code>h ^= (h &gt;&gt;&gt; 20) ^ (h &gt;&gt;&gt; 12);
+return h ^ (h &gt;&gt;&gt; 7) ^ (h &gt;&gt;&gt; 4);
+</code></pre>
+
+<p>}</p>
+
+<p>static int indexFor(int h, int length) {</p>
+
+<pre><code>return h &amp; (length-1);
+</code></pre>
+
+<p>}
+```</p>
+
+<p>GET取出的过程
+1 判断key是不是为空，为空的话，默认在table[0]这个链表里找;
+2 key非空的话，通过对hashcode进行hash，算出最终的hash值;
+3 通过indexfor方法找到对应的链表table[i];
+4 在链表里，通过比较对象的hash值和key值。如果完全相同的话，返回对象。如果没有找到，返回null。
+```java
+public V get(Object key) {</p>
+
+<pre><code>if (key == null)
+    return getForNullKey();
+int hash = hash(key.hashCode());
+for (Entry&lt;K,V&gt; e = table[indexFor(hash, table.length)];
+    e != null;
+    e = e.next) {
+    Object k;
+    if (e.hash == hash &amp;&amp; ((k = e.key) == key || key.equals(k)))
+        return e.value;
+}
+return null;
+</code></pre>
+
+<p>}</p>
+
+<p>static int indexFor(int h, int length) {</p>
+
+<pre><code>return h &amp; (length-1);
+</code></pre>
+
+<p>}
+```
+(3)、Fail-first机制</p>
+
+<p>HashMap不是线程安全。HashMap中有个成员变量modCount用来计算保障当前的map数据没有其它线程在同时修改。
+如果有多个线程同时修改，会抛出ConcurrentModificationException看如下代码，用hashiterator方法来遍历map的时候，
+ expectedModCount会被赋予最新的modCount值，调用nextEntry时，检查modCount值相等则不会报错。
+调用iterator的remove方法，会让modCount加1，同时expectedModCount也被更新到最新。
+所以下次在调用nextEntry时，连个值还是相等的。
+```java</p>
+
+<pre><code>        HashIterator() {
+        expectedModCount = modCount;
+        if (size &gt; 0) { // advance to first entry
+            Entry[] t = table;
+            while (index &lt; t.length &amp;&amp; (next = t[index++]) == null)
+                ;
+        }
+    }
+
+        final Entry&lt;K,V&gt; nextEntry() {
+        if (modCount != expectedModCount)
+            throw new ConcurrentModificationException();
+        Entry&lt;K,V&gt; e = next;
+        if (e == null)
+            throw new NoSuchElementException();
+
+        if ((next = e.next) == null) {
+            Entry[] t = table;
+            while (index &lt; t.length &amp;&amp; (next = t[index++]) == null)
+                ;
+        }
+        current = e;
+        return e;
+    }
+
+    public void remove() {
+        if (current == null)
+            throw new IllegalStateException();
+        if (modCount != expectedModCount)
+            throw new ConcurrentModificationException();
+        Object k = current.key;
+        current = null;
+        HashMap.this.removeEntryForKey(k);
+        expectedModCount = modCount;
+    }
+</code></pre>
+
+<p>```</p>
+
+<h1>五、HashSet</h1>
+
+<p>HashSet 不会保证iterable的顺序，LinkedHashSet会保证插入的顺序跟你的iterable的顺序一样
+两条规则实现hashCode()在classes：
+1.如果object1 和 object2 equals（），那么他们2个应该有相同的hashcode
+2.如果object1 和 object2 有一样的hashcode,那么他们不一定会equal.</p>
+
+<p>HashSet源码解读
+```java
+public class HashSet<E></p>
+
+<pre><code>extends AbstractSet&lt;E&gt;
+implements Set&lt;E&gt;, Cloneable, java.io.Serializable
+</code></pre>
+
+<p>{</p>
+
+<pre><code>static final long serialVersionUID = -5024744406713321676L;
+
+//使用HashMap的key保存HashSet中的所有元素
+private transient HashMap&lt;E,Object&gt; map;
+
+// Dummy value to associate with an Object in the backing Map
+//定义一个虚拟的Object对象作为HashMap的value
+private static final Object PRESENT = new Object();
+
+/**
+ * Constructs a new, empty set; the backing &lt;tt&gt;HashMap&lt;/tt&gt; instance has
+ * default initial capacity (16) and load factor (0.75).
+ */
+ //初始化HashSet，底层会初始化一个HashMap
+public HashSet() {
+map = new HashMap&lt;E,Object&gt;();
+}
+</code></pre>
+
+<p>//指定初始容量和loadfactor来初始化HashSet，其实就是初始化HashMap</p>
+
+<pre><code> //loadfactor = 散列表的实际元素数目（n）/ 散列表的容量（m）
+public HashSet(int initialCapacity, float loadFactor) {
+map = new HashMap&lt;E,Object&gt;(initialCapacity, loadFactor);
+}
+
+/**
+ * Constructs a new, empty set; the backing &lt;tt&gt;HashMap&lt;/tt&gt; instance has
+ * the specified initial capacity and default load factor (0.75).
+ *
+ * @param      initialCapacity   the initial capacity of the hash table
+ * @throws     IllegalArgumentException if the initial capacity is less
+ *             than zero
+ */
+public HashSet(int initialCapacity) {
+map = new HashMap&lt;E,Object&gt;(initialCapacity);
+}
+
+/**
+ * Constructs a new, empty linked hash set.  (This package private
+ * constructor is only used by LinkedHashSet.) The backing
+ * HashMap instance is a LinkedHashMap with the specified initial
+ * capacity and the specified load factor.
+ *
+ * @param      initialCapacity   the initial capacity of the hash map
+ * @param      loadFactor        the load factor of the hash map
+ * @param      dummy             ignored (distinguishes this
+ *             constructor from other int, float constructor.)
+ * @throws     IllegalArgumentException if the initial capacity is less
+ *             than zero, or if the load factor is nonpositive
+ */
+HashSet(int initialCapacity, float loadFactor, boolean dummy) {
+map = new LinkedHashMap&lt;E,Object&gt;(initialCapacity, loadFactor);
+}
+
+/**
+ * Returns an iterator over the elements in this set.  The elements
+ * are returned in no particular order.
+ *
+ * @return an Iterator over the elements in this set
+ * @see ConcurrentModificationException
+ */
+ //调用Map的keyset来返回迭代器
+public Iterator&lt;E&gt; iterator() {
+return map.keySet().iterator();
+}
+</code></pre>
+
+<p>/**</p>
+
+<pre><code> * Adds the specified element to this set if it is not already present.
+ * More formally, adds the specified element &lt;tt&gt;e&lt;/tt&gt; to this set if
+ * this set contains no element &lt;tt&gt;e2&lt;/tt&gt; such that
+ * &lt;tt&gt;(e==null&amp;nbsp;?&amp;nbsp;e2==null&amp;nbsp;:&amp;nbsp;e.equals(e2))&lt;/tt&gt;.
+ * If this set already contains the element, the call leaves the set
+ * unchanged and returns &lt;tt&gt;false&lt;/tt&gt;.
+ *
+ * @param e element to be added to this set
+ * @return &lt;tt&gt;true&lt;/tt&gt; if this set did not already contain the specified
+ * element
+ */
+ //将e作为key插入了Hashmap
+public boolean add(E e) {
+return map.put(e, PRESENT)==null;
+}
+</code></pre>
+
+<p>/**</p>
+
+<pre><code> * Returns a shallow copy of this &lt;tt&gt;HashSet&lt;/tt&gt; instance: the elements
+ * themselves are not cloned.
+ *
+ * @return a shallow copy of this set
+ */
+ //拷贝通过两步完成:1、通过调用super.clone完成父类的拷贝；2、通过调用map.clone()完成对成员变量map的拷贝。注意map的拷贝也是调用super.clone完成，所以拷贝都是浅拷贝。另外需要注意拷贝过程会抛出CloneNotSupportedException异常，这是一个检查异常。
+public Object clone() {
+try {
+    HashSet&lt;E&gt; newSet = (HashSet&lt;E&gt;) super.clone();
+    newSet.map = (HashMap&lt;E, Object&gt;) map.clone();
+    return newSet;
+} catch (CloneNotSupportedException e) {
+    throw new InternalError();
+}
+}
+</code></pre>
+
+<p>```</p>
+
+<h1>六、ArrayList vs LinkedList</h1>
+
+<p>ArrayList，实现是一个数组，动态扩容，每次当超出capacity, 就把数组的size扩大，然后把以前的内容copy到新的数组里面去。</p>
+
+<p>ArrayList 如何实现的fail-fast策略，是在每个对于ArrayList结构发生变化的方法里面(比如：add, remove)，都有个modCount这样的变量来记录，然后在iterator里面，构造iterator时候，把modcount 赋值给 exceptCount, 然后check是否相等这2个变量。</p>
+
+<p>LinkedList, 实现是一个双向链表。</p>
+
+<pre><code>            ArrayList,      LinkedList
+</code></pre>
+
+<p>Get(index)      O(1)            O(n)
+Add             O(1)            O(1)
+Remove      O(n &ndash; index)          O(1)
+Fail-fast的实现，modifyCount != exceptiedCount.
+它们2个都是线程不安全的。</p>
+
+<h1>七、好的实践</h1>
+
+<h2>使用LinkedHashMap构建LRU缓存</h2>
+
+<p>(1) LRU缓存
+我们用缓存来存放以前读取的数据，而不是直接丢掉，这样，再次读取的时候，可以直接在缓存里面取，而不用再重新查找一遍，这样系统的反应能力会有很大提高。但是，当我们读取的个数特别大的时候，我们不可能把所有已经读取的数据都放在缓存里，毕竟内存大小是一定的，我们一般把最近常读取的放在缓存里。
+LRU缓存利用了这样的一种思想。LRU是Least Recently Used 的缩写，翻译过来就是“最近最少使用”，也就是说，LRU缓存把最近最少使用的数据移除，让给最新读取的数据。而往往最常读取的，也是读取次数最多的，所以，利用LRU缓存，我们能够提高系统的性能。
+(2) 为什么是LinkedHashMap
+第一，它的数据结构包含一个双向链表，其源代码片段如下：
+```java
+public class LinkedHashMap&lt;K,V>  extends HashMap&lt;K,V>  implements Map&lt;K,V> {</p>
+
+<pre><code>/**
+ * The head of the doubly linked list.
+ */
+private transient Entry&lt;K,V&gt; header;
+</code></pre>
+
+<p>其中Entry的定义的代码片段如下：
+/<em>*                                                                     <br/>
+ * LinkedHashMap entry.                                                 <br/>
+ </em>/                                                                     <br/>
+private static class Entry&lt;K,V> extends HashMap.Entry&lt;K,V> {</p>
+
+<pre><code>// These fields comprise the doubly linked list used for iteration.   
+Entry&lt;K,V&gt; before, after;
+</code></pre>
+
+<p><code>
+可见这个双向链表就具备了实现LRU的基础，每次访问LinkedHashMap里的元素或者向LinkedHashMap里添加元素时，都会更新这个双向链表，让其header永远指向最少使用的元素，其代码实现可以参考LinkedHashMap的源代码。
+第二，LinkedHashMap本身有一个方法用于判断是否需要移除最少使用的元素，但是，原始方法默认不需要移除，该方法实现的源代码如下：
+</code>java
+protected boolean removeEldestEntry(Map.Entry&lt;K,V> eldest) {</p>
+
+<pre><code>    return false;
+</code></pre>
+
+<p>}<br/>
+<code>                
+实际使用中，可以将header指向的最少使用的元素作为该方法的入参，然后重写方法  removeEldestEntry，可以根据自己的条件来决定是否删除该元素。
+(3) 实现样例
+基于以上的分析，下面给出一个简单的LUR缓存的实现样例，代码如下：
+</code>java
+public class LRULinkedHashMap&lt;K, V> extends LinkedHashMap&lt;K, V> {</p>
+
+<pre><code>/** serialVersionUID */
+private static final long serialVersionUID = -5933045562735378538L;
+/** 最大数据存储容量 */
+private static final int LRU_MAX_CAPACITY = 1024;
+/** 剩余内存空间的阈值，设置的为50M */
+private static final int SPACE_THRESHOLD = 50 * 1024 * 1024; 
+</code></pre>
+
+<p>/<em>* 存储数据容量 </em>/</p>
+
+<pre><code>private int capacity;
+public LRULinkedHashMap() {
+    super();
+}
+
+/**
+ * 带参数构造方法
+ * 
+ * @param initialCapacity 容量
+ * @param loadFactor 装载因子
+ * @param isLRU 是否使用lru算法，true：使用（按方案顺序排序）;false：不使用（按存储顺序排序）
+ */
+public LRULinkedHashMap(int initialCapacity, float loadFactor, boolean isLRU) {
+    super(initialCapacity, loadFactor, true);
+    capacity = LRU_MAX_CAPACITY;
+}
+
+/**
+ * 带参数构造方法
+ * 
+ * @param initialCapacity 容量
+ * @param loadFactor 装载因子
+ * @param isLRU 是否使用lru算法，true：使用（按方案顺序排序）;false：不使用（按存储顺序排序）
+ * @param lruCapacity  lru存储数据容量
+ */
+public LRULinkedHashMap(int initialCapacity, float loadFactor,
+        boolean isLRU, int lruCapacity) {
+    super(initialCapacity, loadFactor, true);
+    this.capacity = lruCapacity;
+}
+
+@Override
+protected boolean removeEldestEntry(Entry&lt;K, V&gt; eldest) {
+    if (capacity &gt; 0 &amp;&amp; size() &gt; capacity) {
+        return true;
+    } else if (Runtime.getRuntime().freeMemory() &lt; SPACE_THRESHOLD) {
+        return true;
+    }
+    return false;
+}
+} 
+</code></pre>
+
+<p>```</p>
 ]]></content>
   </entry>
   

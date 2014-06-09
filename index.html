@@ -628,6 +628,722 @@ JVM并不需要为此机制作出改动。编译器通过内联函数和扩展�
 
     </article>
   
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2014/06/09/java-collection/">关于Java集合的那些事儿</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-06-09T10:32:40+08:00" pubdate data-updated="true">Jun 9<span>th</span>, 2014</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><h1>一、集合的体系结构</h1>
+
+<p><img class="center" src="/images/collection.png" width="380" height="320"></p>
+
+<p>Collection是集合的基类，List和Set均继承自该类。在使用上，List：有序(元素存入集合的顺序和取出的顺序一致)，元素都有索引，元素可以重复，而Set中元素要保证不能重复。Map集合存储和Collection有着很大不同：
+(1)Collection一次存一个元素；Map一次存一对元素。</p>
+
+<p>(2)Collection是单列集合；Map是双列集合。</p>
+
+<p>(3)Map中的存储的一对元素：一个是键，一个是值，键与值之间有对应(映射)关系。</p>
+
+<h1>二、Set和Map的关系，以及Map和List的关系</h1>
+
+<p>以HashMap为例，k-v键值对以Entry的方式存入了它的数据成员table，这个table我们可以认为它就是一个Set，因为这个table中的元素是彼此不相等；
+反过来说，Set中的元素有一个索引与之对应，所以从这个角度看Set也是Map，而且我们可以从HashSet的实现看到，HashSet其实是通过HashMap来实现的；
+Map和List的关系，与Map和Set的关系类似。</p>
+
+<h1>三、ArrayList</h1>
+
+<p>(1)使用场景</p>
+
+<p>继承自List，内用Object[]数组存放数据，封装对数组的操作，动态扩容，频繁的增（超出capacity则需要System.arraycopy，指定插入位置必执行System.arraycopy）删（每次删除都要System.arraycopy）影响性能，查询优势。当你需要一个数据结构存储数据，少增删多查询，可以使用ArrayList。</p>
+
+<p>(2)源码解读</p>
+
+<p>ArrayList的add/remove/subList代码解读：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+</pre></td><td class='code'><pre><code class='java'><span class='line'><span class="kd">public</span> <span class="kt">boolean</span> <span class="nf">add</span><span class="o">(</span><span class="n">E</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'><span class="cm">/*内部方法，计数并判断是否需要扩容</span>
+</span><span class='line'><span class="cm">如果elementData已满，增加其大小至elementData.length + DEFAULT_CAPACITY</span>
+</span><span class='line'><span class="cm">     */</span>
+</span><span class='line'>        <span class="n">ensureCapacityInternal</span><span class="o">(</span><span class="n">size</span> <span class="o">+</span> <span class="mi">1</span><span class="o">);</span>
+</span><span class='line'><span class="n">elementData</span><span class="o">[</span><span class="n">size</span><span class="o">++]</span> <span class="o">=</span> <span class="n">e</span><span class="o">;</span>
+</span><span class='line'>  <span class="c1">//永远返回true，对于错误情况总是抛出异常</span>
+</span><span class='line'>        <span class="k">return</span> <span class="kc">true</span><span class="o">;</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="err">删除：</span>
+</span><span class='line'><span class="kd">public</span> <span class="n">E</span> <span class="nf">remove</span><span class="o">(</span><span class="kt">int</span> <span class="n">index</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>  <span class="c1">//如果传入的index大于elementData存储总数，抛IndexOutOfBoundsException</span>
+</span><span class='line'>        <span class="n">rangeCheck</span><span class="o">(</span><span class="n">index</span><span class="o">);</span>
+</span><span class='line'>  <span class="c1">//修改记录数，为做同步检查</span>
+</span><span class='line'>        <span class="n">modCount</span><span class="o">++;</span>
+</span><span class='line'>        <span class="n">E</span> <span class="n">oldValue</span> <span class="o">=</span> <span class="n">elementData</span><span class="o">(</span><span class="n">index</span><span class="o">);</span>
+</span><span class='line'>  <span class="c1">//需要移动的数量。影响的是index之后的所有数据</span>
+</span><span class='line'>        <span class="kt">int</span> <span class="n">numMoved</span> <span class="o">=</span> <span class="n">size</span> <span class="o">-</span> <span class="n">index</span> <span class="o">-</span> <span class="mi">1</span><span class="o">;</span>
+</span><span class='line'>  <span class="c1">//如果移除的是最后一位，就没有必要重新拷贝。</span>
+</span><span class='line'>        <span class="k">if</span> <span class="o">(</span><span class="n">numMoved</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="o">)</span>
+</span><span class='line'>            <span class="n">System</span><span class="o">.</span><span class="na">arraycopy</span><span class="o">(</span><span class="n">elementData</span><span class="o">,</span> <span class="n">index</span><span class="o">+</span><span class="mi">1</span><span class="o">,</span> <span class="n">elementData</span><span class="o">,</span> <span class="n">index</span><span class="o">,</span><span class="n">numMoved</span><span class="o">);</span>
+</span><span class='line'>  <span class="c1">//把多余的最后一位清空，GC会回收</span>
+</span><span class='line'>        <span class="n">elementData</span><span class="o">[--</span><span class="n">size</span><span class="o">]</span> <span class="o">=</span> <span class="kc">null</span><span class="o">;</span>
+</span><span class='line'>        <span class="k">return</span> <span class="n">oldValue</span><span class="o">;</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">SubList</span><span class="err">（代码比较长，摘取部分）</span>
+</span><span class='line'>  <span class="c1">//constructor</span>
+</span><span class='line'><span class="n">SubList</span><span class="o">(</span><span class="n">AbstractList</span><span class="o">&lt;</span><span class="n">E</span><span class="o">&gt;</span> <span class="n">parent</span><span class="o">,</span>
+</span><span class='line'>                <span class="kt">int</span> <span class="n">offset</span><span class="o">,</span> <span class="kt">int</span> <span class="n">fromIndex</span><span class="o">,</span> <span class="kt">int</span> <span class="n">toIndex</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>      <span class="k">this</span><span class="o">.</span><span class="na">parent</span> <span class="o">=</span> <span class="n">parent</span><span class="o">;</span> <span class="c1">//将当前arraylist以参数形式传给subList</span>
+</span><span class='line'>      <span class="k">this</span><span class="o">.</span><span class="na">parentOffset</span> <span class="o">=</span> <span class="n">fromIndex</span><span class="o">;</span>
+</span><span class='line'>      <span class="k">this</span><span class="o">.</span><span class="na">offset</span> <span class="o">=</span> <span class="n">offset</span> <span class="o">+</span> <span class="n">fromIndex</span><span class="o">;</span>
+</span><span class='line'>      <span class="k">this</span><span class="o">.</span><span class="na">size</span> <span class="o">=</span> <span class="n">toIndex</span> <span class="o">-</span> <span class="n">fromIndex</span><span class="o">;</span> <span class="c1">//记录sublist的size，与parent分开处理</span>
+</span><span class='line'>      <span class="k">this</span><span class="o">.</span><span class="na">modCount</span> <span class="o">=</span> <span class="n">ArrayList</span><span class="o">.</span><span class="na">this</span><span class="o">.</span><span class="na">modCount</span><span class="o">;</span> <span class="c1">//防控并发修改</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'><span class="kd">public</span> <span class="n">E</span> <span class="nf">set</span><span class="o">(</span><span class="kt">int</span> <span class="n">index</span><span class="o">,</span> <span class="n">E</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>      <span class="n">rangeCheck</span><span class="o">(</span><span class="n">index</span><span class="o">);</span> <span class="c1">//sublist自身的方法，将index与sublist的size做比较</span>
+</span><span class='line'>      <span class="n">checkForComodification</span><span class="o">();</span> <span class="c1">//只检查了ModCount，没有变更。Set不是结构性变更，所以不用更改modCount。</span>
+</span><span class='line'>      <span class="n">E</span> <span class="n">oldValue</span> <span class="o">=</span> <span class="n">ArrayList</span><span class="o">.</span><span class="na">this</span><span class="o">.</span><span class="na">elementData</span><span class="o">(</span><span class="n">offset</span> <span class="o">+</span> <span class="n">index</span><span class="o">);</span>
+</span><span class='line'>      <span class="n">ArrayList</span><span class="o">.</span><span class="na">this</span><span class="o">.</span><span class="na">elementData</span><span class="o">[</span><span class="n">offset</span> <span class="o">+</span> <span class="n">index</span><span class="o">]</span> <span class="o">=</span> <span class="n">e</span><span class="o">;</span> <span class="c1">//直接修改父类的数据</span>
+</span><span class='line'>      <span class="k">return</span> <span class="n">oldValue</span><span class="o">;</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'><span class="c1">//对于sublist的add方法，必须指定index</span>
+</span><span class='line'>  <span class="kd">public</span> <span class="kt">void</span> <span class="nf">add</span><span class="o">(</span><span class="kt">int</span> <span class="n">index</span><span class="o">,</span> <span class="n">E</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>        <span class="n">rangeCheckForAdd</span><span class="o">(</span><span class="n">index</span><span class="o">);</span>
+</span><span class='line'>        <span class="n">checkForComodification</span><span class="o">();</span>
+</span><span class='line'>        <span class="n">parent</span><span class="o">.</span><span class="na">add</span><span class="o">(</span><span class="n">parentOffset</span> <span class="o">+</span> <span class="n">index</span><span class="o">,</span> <span class="n">e</span><span class="o">);</span><span class="c1">//调用parent对象的add方法完成此操作,因此父类数据也会被修改。</span>
+</span><span class='line'>        <span class="k">this</span><span class="o">.</span><span class="na">modCount</span> <span class="o">=</span> <span class="n">parent</span><span class="o">.</span><span class="na">modCount</span><span class="o">;</span><span class="c1">//add是结构性的更变，需要修改modCount。</span>
+</span><span class='line'>        <span class="k">this</span><span class="o">.</span><span class="na">size</span><span class="o">++;</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>初始capacity为10, 视应用情况使用ensureCapacity为数组扩容，减少System.arraycopy的次数。</p>
+
+<h1>四、HashMap</h1>
+
+<p>HashMap是线程不安全的
+HashTable是线程安全的，但是粒度很大
+ConcurrentHashMap, 线程安全，粒度比较小
+利用segment缩小锁的范围</p>
+
+<p>(1)、从HashMap的结构可以看出，HashMap的设计初衷是想结合链表和线性表的优势而达到较平衡的查询、添加和删除性能。</p>
+
+<p>(2)、源码分析</p>
+
+<p>Hash方法中，hashcode 的高位参加 hash计算，这样计算出来的hash值可以最大限度的体现对象之间的差异，目的是将对象放在不同的数组位置上。</p>
+
+<p>Index方法中，对hash取模操作，这里的magic是length的长度是2的幂数，length-1后二进制都是01111…1, 从而可以快速取模。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class='java'><span class='line'><span class="kd">static</span> <span class="kt">int</span> <span class="nf">hash</span><span class="o">(</span><span class="kt">int</span> <span class="n">h</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>    <span class="n">h</span> <span class="o">^=</span> <span class="o">(</span><span class="n">h</span> <span class="o">&gt;&gt;&gt;</span> <span class="mi">20</span><span class="o">)</span> <span class="o">^</span> <span class="o">(</span><span class="n">h</span> <span class="o">&gt;&gt;&gt;</span> <span class="mi">12</span><span class="o">);</span>
+</span><span class='line'>    <span class="k">return</span> <span class="n">h</span> <span class="o">^</span> <span class="o">(</span><span class="n">h</span> <span class="o">&gt;&gt;&gt;</span> <span class="mi">7</span><span class="o">)</span> <span class="o">^</span> <span class="o">(</span><span class="n">h</span> <span class="o">&gt;&gt;&gt;</span> <span class="mi">4</span><span class="o">);</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="kd">static</span> <span class="kt">int</span> <span class="nf">indexFor</span><span class="o">(</span><span class="kt">int</span> <span class="n">h</span><span class="o">,</span> <span class="kt">int</span> <span class="n">length</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>    <span class="k">return</span> <span class="n">h</span> <span class="o">&amp;</span> <span class="o">(</span><span class="n">length</span><span class="o">-</span><span class="mi">1</span><span class="o">);</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>GET取出的过程
+1 判断key是不是为空，为空的话，默认在table[0]这个链表里找;
+2 key非空的话，通过对hashcode进行hash，算出最终的hash值;
+3 通过indexfor方法找到对应的链表table[i];
+4 在链表里，通过比较对象的hash值和key值。如果完全相同的话，返回对象。如果没有找到，返回null。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+</pre></td><td class='code'><pre><code class='java'><span class='line'><span class="kd">public</span> <span class="n">V</span> <span class="nf">get</span><span class="o">(</span><span class="n">Object</span> <span class="n">key</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>    <span class="k">if</span> <span class="o">(</span><span class="n">key</span> <span class="o">==</span> <span class="kc">null</span><span class="o">)</span>
+</span><span class='line'>        <span class="k">return</span> <span class="nf">getForNullKey</span><span class="o">();</span>
+</span><span class='line'>    <span class="kt">int</span> <span class="n">hash</span> <span class="o">=</span> <span class="n">hash</span><span class="o">(</span><span class="n">key</span><span class="o">.</span><span class="na">hashCode</span><span class="o">());</span>
+</span><span class='line'>    <span class="k">for</span> <span class="o">(</span><span class="n">Entry</span><span class="o">&lt;</span><span class="n">K</span><span class="o">,</span><span class="n">V</span><span class="o">&gt;</span> <span class="n">e</span> <span class="o">=</span> <span class="n">table</span><span class="o">[</span><span class="n">indexFor</span><span class="o">(</span><span class="n">hash</span><span class="o">,</span> <span class="n">table</span><span class="o">.</span><span class="na">length</span><span class="o">)];</span>
+</span><span class='line'>        <span class="n">e</span> <span class="o">!=</span> <span class="kc">null</span><span class="o">;</span>
+</span><span class='line'>        <span class="n">e</span> <span class="o">=</span> <span class="n">e</span><span class="o">.</span><span class="na">next</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>        <span class="n">Object</span> <span class="n">k</span><span class="o">;</span>
+</span><span class='line'>        <span class="k">if</span> <span class="o">(</span><span class="n">e</span><span class="o">.</span><span class="na">hash</span> <span class="o">==</span> <span class="n">hash</span> <span class="o">&amp;&amp;</span> <span class="o">((</span><span class="n">k</span> <span class="o">=</span> <span class="n">e</span><span class="o">.</span><span class="na">key</span><span class="o">)</span> <span class="o">==</span> <span class="n">key</span> <span class="o">||</span> <span class="n">key</span><span class="o">.</span><span class="na">equals</span><span class="o">(</span><span class="n">k</span><span class="o">)))</span>
+</span><span class='line'>            <span class="k">return</span> <span class="n">e</span><span class="o">.</span><span class="na">value</span><span class="o">;</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'>    <span class="k">return</span> <span class="kc">null</span><span class="o">;</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="kd">static</span> <span class="kt">int</span> <span class="nf">indexFor</span><span class="o">(</span><span class="kt">int</span> <span class="n">h</span><span class="o">,</span> <span class="kt">int</span> <span class="n">length</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>    <span class="k">return</span> <span class="n">h</span> <span class="o">&amp;</span> <span class="o">(</span><span class="n">length</span><span class="o">-</span><span class="mi">1</span><span class="o">);</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>(3)、Fail-first机制</p>
+
+<p>HashMap不是线程安全。HashMap中有个成员变量modCount用来计算保障当前的map数据没有其它线程在同时修改。
+如果有多个线程同时修改，会抛出ConcurrentModificationException看如下代码，用hashiterator方法来遍历map的时候，
+ expectedModCount会被赋予最新的modCount值，调用nextEntry时，检查modCount值相等则不会报错。
+调用iterator的remove方法，会让modCount加1，同时expectedModCount也被更新到最新。
+所以下次在调用nextEntry时，连个值还是相等的。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+</pre></td><td class='code'><pre><code class='java'><span class='line'>     <span class="n">HashIterator</span><span class="o">()</span> <span class="o">{</span>
+</span><span class='line'>        <span class="n">expectedModCount</span> <span class="o">=</span> <span class="n">modCount</span><span class="o">;</span>
+</span><span class='line'>        <span class="k">if</span> <span class="o">(</span><span class="n">size</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="o">)</span> <span class="o">{</span> <span class="c1">// advance to first entry</span>
+</span><span class='line'>            <span class="n">Entry</span><span class="o">[]</span> <span class="n">t</span> <span class="o">=</span> <span class="n">table</span><span class="o">;</span>
+</span><span class='line'>            <span class="k">while</span> <span class="o">(</span><span class="n">index</span> <span class="o">&lt;</span> <span class="n">t</span><span class="o">.</span><span class="na">length</span> <span class="o">&amp;&amp;</span> <span class="o">(</span><span class="n">next</span> <span class="o">=</span> <span class="n">t</span><span class="o">[</span><span class="n">index</span><span class="o">++])</span> <span class="o">==</span> <span class="kc">null</span><span class="o">)</span>
+</span><span class='line'>                <span class="o">;</span>
+</span><span class='line'>        <span class="o">}</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'>      <span class="kd">final</span> <span class="n">Entry</span><span class="o">&lt;</span><span class="n">K</span><span class="o">,</span><span class="n">V</span><span class="o">&gt;</span> <span class="n">nextEntry</span><span class="o">()</span> <span class="o">{</span>
+</span><span class='line'>        <span class="k">if</span> <span class="o">(</span><span class="n">modCount</span> <span class="o">!=</span> <span class="n">expectedModCount</span><span class="o">)</span>
+</span><span class='line'>            <span class="k">throw</span> <span class="k">new</span> <span class="nf">ConcurrentModificationException</span><span class="o">();</span>
+</span><span class='line'>        <span class="n">Entry</span><span class="o">&lt;</span><span class="n">K</span><span class="o">,</span><span class="n">V</span><span class="o">&gt;</span> <span class="n">e</span> <span class="o">=</span> <span class="n">next</span><span class="o">;</span>
+</span><span class='line'>        <span class="k">if</span> <span class="o">(</span><span class="n">e</span> <span class="o">==</span> <span class="kc">null</span><span class="o">)</span>
+</span><span class='line'>            <span class="k">throw</span> <span class="k">new</span> <span class="nf">NoSuchElementException</span><span class="o">();</span>
+</span><span class='line'>
+</span><span class='line'>        <span class="k">if</span> <span class="o">((</span><span class="n">next</span> <span class="o">=</span> <span class="n">e</span><span class="o">.</span><span class="na">next</span><span class="o">)</span> <span class="o">==</span> <span class="kc">null</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>            <span class="n">Entry</span><span class="o">[]</span> <span class="n">t</span> <span class="o">=</span> <span class="n">table</span><span class="o">;</span>
+</span><span class='line'>            <span class="k">while</span> <span class="o">(</span><span class="n">index</span> <span class="o">&lt;</span> <span class="n">t</span><span class="o">.</span><span class="na">length</span> <span class="o">&amp;&amp;</span> <span class="o">(</span><span class="n">next</span> <span class="o">=</span> <span class="n">t</span><span class="o">[</span><span class="n">index</span><span class="o">++])</span> <span class="o">==</span> <span class="kc">null</span><span class="o">)</span>
+</span><span class='line'>                <span class="o">;</span>
+</span><span class='line'>        <span class="o">}</span>
+</span><span class='line'>        <span class="n">current</span> <span class="o">=</span> <span class="n">e</span><span class="o">;</span>
+</span><span class='line'>        <span class="k">return</span> <span class="n">e</span><span class="o">;</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="kd">public</span> <span class="kt">void</span> <span class="nf">remove</span><span class="o">()</span> <span class="o">{</span>
+</span><span class='line'>        <span class="k">if</span> <span class="o">(</span><span class="n">current</span> <span class="o">==</span> <span class="kc">null</span><span class="o">)</span>
+</span><span class='line'>            <span class="k">throw</span> <span class="k">new</span> <span class="nf">IllegalStateException</span><span class="o">();</span>
+</span><span class='line'>        <span class="k">if</span> <span class="o">(</span><span class="n">modCount</span> <span class="o">!=</span> <span class="n">expectedModCount</span><span class="o">)</span>
+</span><span class='line'>            <span class="k">throw</span> <span class="k">new</span> <span class="nf">ConcurrentModificationException</span><span class="o">();</span>
+</span><span class='line'>        <span class="n">Object</span> <span class="n">k</span> <span class="o">=</span> <span class="n">current</span><span class="o">.</span><span class="na">key</span><span class="o">;</span>
+</span><span class='line'>        <span class="n">current</span> <span class="o">=</span> <span class="kc">null</span><span class="o">;</span>
+</span><span class='line'>        <span class="n">HashMap</span><span class="o">.</span><span class="na">this</span><span class="o">.</span><span class="na">removeEntryForKey</span><span class="o">(</span><span class="n">k</span><span class="o">);</span>
+</span><span class='line'>        <span class="n">expectedModCount</span> <span class="o">=</span> <span class="n">modCount</span><span class="o">;</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<h1>五、HashSet</h1>
+
+<p>HashSet 不会保证iterable的顺序，LinkedHashSet会保证插入的顺序跟你的iterable的顺序一样
+两条规则实现hashCode()在classes：
+1.如果object1 和 object2 equals（），那么他们2个应该有相同的hashcode
+2.如果object1 和 object2 有一样的hashcode,那么他们不一定会equal.</p>
+
+<p>HashSet源码解读</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+<span class='line-number'>67</span>
+<span class='line-number'>68</span>
+<span class='line-number'>69</span>
+<span class='line-number'>70</span>
+<span class='line-number'>71</span>
+<span class='line-number'>72</span>
+<span class='line-number'>73</span>
+<span class='line-number'>74</span>
+<span class='line-number'>75</span>
+<span class='line-number'>76</span>
+<span class='line-number'>77</span>
+<span class='line-number'>78</span>
+<span class='line-number'>79</span>
+<span class='line-number'>80</span>
+<span class='line-number'>81</span>
+<span class='line-number'>82</span>
+<span class='line-number'>83</span>
+<span class='line-number'>84</span>
+<span class='line-number'>85</span>
+<span class='line-number'>86</span>
+<span class='line-number'>87</span>
+<span class='line-number'>88</span>
+<span class='line-number'>89</span>
+<span class='line-number'>90</span>
+<span class='line-number'>91</span>
+<span class='line-number'>92</span>
+<span class='line-number'>93</span>
+<span class='line-number'>94</span>
+<span class='line-number'>95</span>
+<span class='line-number'>96</span>
+<span class='line-number'>97</span>
+<span class='line-number'>98</span>
+<span class='line-number'>99</span>
+<span class='line-number'>100</span>
+</pre></td><td class='code'><pre><code class='java'><span class='line'><span class="kd">public</span> <span class="kd">class</span> <span class="nc">HashSet</span><span class="o">&lt;</span><span class="n">E</span><span class="o">&gt;</span>
+</span><span class='line'>    <span class="kd">extends</span> <span class="n">AbstractSet</span><span class="o">&lt;</span><span class="n">E</span><span class="o">&gt;</span>
+</span><span class='line'>    <span class="kd">implements</span> <span class="n">Set</span><span class="o">&lt;</span><span class="n">E</span><span class="o">&gt;,</span> <span class="n">Cloneable</span><span class="o">,</span> <span class="n">java</span><span class="o">.</span><span class="na">io</span><span class="o">.</span><span class="na">Serializable</span>
+</span><span class='line'><span class="o">{</span>
+</span><span class='line'>    <span class="kd">static</span> <span class="kd">final</span> <span class="kt">long</span> <span class="n">serialVersionUID</span> <span class="o">=</span> <span class="o">-</span><span class="mi">5024744406713321676L</span><span class="o">;</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="c1">//使用HashMap的key保存HashSet中的所有元素</span>
+</span><span class='line'>    <span class="kd">private</span> <span class="kd">transient</span> <span class="n">HashMap</span><span class="o">&lt;</span><span class="n">E</span><span class="o">,</span><span class="n">Object</span><span class="o">&gt;</span> <span class="n">map</span><span class="o">;</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="c1">// Dummy value to associate with an Object in the backing Map</span>
+</span><span class='line'>    <span class="c1">//定义一个虚拟的Object对象作为HashMap的value</span>
+</span><span class='line'>    <span class="kd">private</span> <span class="kd">static</span> <span class="kd">final</span> <span class="n">Object</span> <span class="n">PRESENT</span> <span class="o">=</span> <span class="k">new</span> <span class="n">Object</span><span class="o">();</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="cm">/**</span>
+</span><span class='line'><span class="cm">     * Constructs a new, empty set; the backing &lt;tt&gt;HashMap&lt;/tt&gt; instance has</span>
+</span><span class='line'><span class="cm">     * default initial capacity (16) and load factor (0.75).</span>
+</span><span class='line'><span class="cm">     */</span>
+</span><span class='line'>     <span class="c1">//初始化HashSet，底层会初始化一个HashMap</span>
+</span><span class='line'>    <span class="kd">public</span> <span class="nf">HashSet</span><span class="o">()</span> <span class="o">{</span>
+</span><span class='line'>    <span class="n">map</span> <span class="o">=</span> <span class="k">new</span> <span class="n">HashMap</span><span class="o">&lt;</span><span class="n">E</span><span class="o">,</span><span class="n">Object</span><span class="o">&gt;();</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'><span class="c1">//指定初始容量和loadfactor来初始化HashSet，其实就是初始化HashMap</span>
+</span><span class='line'>     <span class="c1">//loadfactor = 散列表的实际元素数目（n）/ 散列表的容量（m）</span>
+</span><span class='line'>    <span class="kd">public</span> <span class="nf">HashSet</span><span class="o">(</span><span class="kt">int</span> <span class="n">initialCapacity</span><span class="o">,</span> <span class="kt">float</span> <span class="n">loadFactor</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>    <span class="n">map</span> <span class="o">=</span> <span class="k">new</span> <span class="n">HashMap</span><span class="o">&lt;</span><span class="n">E</span><span class="o">,</span><span class="n">Object</span><span class="o">&gt;(</span><span class="n">initialCapacity</span><span class="o">,</span> <span class="n">loadFactor</span><span class="o">);</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="cm">/**</span>
+</span><span class='line'><span class="cm">     * Constructs a new, empty set; the backing &lt;tt&gt;HashMap&lt;/tt&gt; instance has</span>
+</span><span class='line'><span class="cm">     * the specified initial capacity and default load factor (0.75).</span>
+</span><span class='line'><span class="cm">     *</span>
+</span><span class='line'><span class="cm">     * @param      initialCapacity   the initial capacity of the hash table</span>
+</span><span class='line'><span class="cm">     * @throws     IllegalArgumentException if the initial capacity is less</span>
+</span><span class='line'><span class="cm">     *             than zero</span>
+</span><span class='line'><span class="cm">     */</span>
+</span><span class='line'>    <span class="kd">public</span> <span class="nf">HashSet</span><span class="o">(</span><span class="kt">int</span> <span class="n">initialCapacity</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>    <span class="n">map</span> <span class="o">=</span> <span class="k">new</span> <span class="n">HashMap</span><span class="o">&lt;</span><span class="n">E</span><span class="o">,</span><span class="n">Object</span><span class="o">&gt;(</span><span class="n">initialCapacity</span><span class="o">);</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="cm">/**</span>
+</span><span class='line'><span class="cm">     * Constructs a new, empty linked hash set.  (This package private</span>
+</span><span class='line'><span class="cm">     * constructor is only used by LinkedHashSet.) The backing</span>
+</span><span class='line'><span class="cm">     * HashMap instance is a LinkedHashMap with the specified initial</span>
+</span><span class='line'><span class="cm">     * capacity and the specified load factor.</span>
+</span><span class='line'><span class="cm">     *</span>
+</span><span class='line'><span class="cm">     * @param      initialCapacity   the initial capacity of the hash map</span>
+</span><span class='line'><span class="cm">     * @param      loadFactor        the load factor of the hash map</span>
+</span><span class='line'><span class="cm">     * @param      dummy             ignored (distinguishes this</span>
+</span><span class='line'><span class="cm">     *             constructor from other int, float constructor.)</span>
+</span><span class='line'><span class="cm">     * @throws     IllegalArgumentException if the initial capacity is less</span>
+</span><span class='line'><span class="cm">     *             than zero, or if the load factor is nonpositive</span>
+</span><span class='line'><span class="cm">     */</span>
+</span><span class='line'>    <span class="n">HashSet</span><span class="o">(</span><span class="kt">int</span> <span class="n">initialCapacity</span><span class="o">,</span> <span class="kt">float</span> <span class="n">loadFactor</span><span class="o">,</span> <span class="kt">boolean</span> <span class="n">dummy</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>    <span class="n">map</span> <span class="o">=</span> <span class="k">new</span> <span class="n">LinkedHashMap</span><span class="o">&lt;</span><span class="n">E</span><span class="o">,</span><span class="n">Object</span><span class="o">&gt;(</span><span class="n">initialCapacity</span><span class="o">,</span> <span class="n">loadFactor</span><span class="o">);</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="cm">/**</span>
+</span><span class='line'><span class="cm">     * Returns an iterator over the elements in this set.  The elements</span>
+</span><span class='line'><span class="cm">     * are returned in no particular order.</span>
+</span><span class='line'><span class="cm">     *</span>
+</span><span class='line'><span class="cm">     * @return an Iterator over the elements in this set</span>
+</span><span class='line'><span class="cm">     * @see ConcurrentModificationException</span>
+</span><span class='line'><span class="cm">     */</span>
+</span><span class='line'>     <span class="c1">//调用Map的keyset来返回迭代器</span>
+</span><span class='line'>    <span class="kd">public</span> <span class="n">Iterator</span><span class="o">&lt;</span><span class="n">E</span><span class="o">&gt;</span> <span class="nf">iterator</span><span class="o">()</span> <span class="o">{</span>
+</span><span class='line'>    <span class="k">return</span> <span class="n">map</span><span class="o">.</span><span class="na">keySet</span><span class="o">().</span><span class="na">iterator</span><span class="o">();</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'><span class="cm">/**</span>
+</span><span class='line'><span class="cm">     * Adds the specified element to this set if it is not already present.</span>
+</span><span class='line'><span class="cm">     * More formally, adds the specified element &lt;tt&gt;e&lt;/tt&gt; to this set if</span>
+</span><span class='line'><span class="cm">     * this set contains no element &lt;tt&gt;e2&lt;/tt&gt; such that</span>
+</span><span class='line'><span class="cm">     * &lt;tt&gt;(e==null&amp;nbsp;?&amp;nbsp;e2==null&amp;nbsp;:&amp;nbsp;e.equals(e2))&lt;/tt&gt;.</span>
+</span><span class='line'><span class="cm">     * If this set already contains the element, the call leaves the set</span>
+</span><span class='line'><span class="cm">     * unchanged and returns &lt;tt&gt;false&lt;/tt&gt;.</span>
+</span><span class='line'><span class="cm">     *</span>
+</span><span class='line'><span class="cm">     * @param e element to be added to this set</span>
+</span><span class='line'><span class="cm">     * @return &lt;tt&gt;true&lt;/tt&gt; if this set did not already contain the specified</span>
+</span><span class='line'><span class="cm">     * element</span>
+</span><span class='line'><span class="cm">     */</span>
+</span><span class='line'>     <span class="c1">//将e作为key插入了Hashmap</span>
+</span><span class='line'>    <span class="kd">public</span> <span class="kt">boolean</span> <span class="nf">add</span><span class="o">(</span><span class="n">E</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>    <span class="k">return</span> <span class="n">map</span><span class="o">.</span><span class="na">put</span><span class="o">(</span><span class="n">e</span><span class="o">,</span> <span class="n">PRESENT</span><span class="o">)==</span><span class="kc">null</span><span class="o">;</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'><span class="cm">/**</span>
+</span><span class='line'><span class="cm">     * Returns a shallow copy of this &lt;tt&gt;HashSet&lt;/tt&gt; instance: the elements</span>
+</span><span class='line'><span class="cm">     * themselves are not cloned.</span>
+</span><span class='line'><span class="cm">     *</span>
+</span><span class='line'><span class="cm">     * @return a shallow copy of this set</span>
+</span><span class='line'><span class="cm">     */</span>
+</span><span class='line'>     <span class="c1">//拷贝通过两步完成:1、通过调用super.clone完成父类的拷贝；2、通过调用map.clone()完成对成员变量map的拷贝。注意map的拷贝也是调用super.clone完成，所以拷贝都是浅拷贝。另外需要注意拷贝过程会抛出CloneNotSupportedException异常，这是一个检查异常。</span>
+</span><span class='line'>    <span class="kd">public</span> <span class="n">Object</span> <span class="nf">clone</span><span class="o">()</span> <span class="o">{</span>
+</span><span class='line'>    <span class="k">try</span> <span class="o">{</span>
+</span><span class='line'>        <span class="n">HashSet</span><span class="o">&lt;</span><span class="n">E</span><span class="o">&gt;</span> <span class="n">newSet</span> <span class="o">=</span> <span class="o">(</span><span class="n">HashSet</span><span class="o">&lt;</span><span class="n">E</span><span class="o">&gt;)</span> <span class="kd">super</span><span class="o">.</span><span class="na">clone</span><span class="o">();</span>
+</span><span class='line'>        <span class="n">newSet</span><span class="o">.</span><span class="na">map</span> <span class="o">=</span> <span class="o">(</span><span class="n">HashMap</span><span class="o">&lt;</span><span class="n">E</span><span class="o">,</span> <span class="n">Object</span><span class="o">&gt;)</span> <span class="n">map</span><span class="o">.</span><span class="na">clone</span><span class="o">();</span>
+</span><span class='line'>        <span class="k">return</span> <span class="n">newSet</span><span class="o">;</span>
+</span><span class='line'>    <span class="o">}</span> <span class="k">catch</span> <span class="o">(</span><span class="n">CloneNotSupportedException</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>        <span class="k">throw</span> <span class="k">new</span> <span class="nf">InternalError</span><span class="o">();</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<h1>六、ArrayList vs LinkedList</h1>
+
+<p>ArrayList，实现是一个数组，动态扩容，每次当超出capacity, 就把数组的size扩大，然后把以前的内容copy到新的数组里面去。</p>
+
+<p>ArrayList 如何实现的fail-fast策略，是在每个对于ArrayList结构发生变化的方法里面(比如：add, remove)，都有个modCount这样的变量来记录，然后在iterator里面，构造iterator时候，把modcount 赋值给 exceptCount, 然后check是否相等这2个变量。</p>
+
+<p>LinkedList, 实现是一个双向链表。</p>
+
+<pre><code>            ArrayList,      LinkedList
+</code></pre>
+
+<p>Get(index)      O(1)            O(n)
+Add             O(1)            O(1)
+Remove      O(n &ndash; index)          O(1)
+Fail-fast的实现，modifyCount != exceptiedCount.
+它们2个都是线程不安全的。</p>
+
+<h1>七、好的实践</h1>
+
+<h2>使用LinkedHashMap构建LRU缓存</h2>
+
+<p>(1) LRU缓存
+我们用缓存来存放以前读取的数据，而不是直接丢掉，这样，再次读取的时候，可以直接在缓存里面取，而不用再重新查找一遍，这样系统的反应能力会有很大提高。但是，当我们读取的个数特别大的时候，我们不可能把所有已经读取的数据都放在缓存里，毕竟内存大小是一定的，我们一般把最近常读取的放在缓存里。
+LRU缓存利用了这样的一种思想。LRU是Least Recently Used 的缩写，翻译过来就是“最近最少使用”，也就是说，LRU缓存把最近最少使用的数据移除，让给最新读取的数据。而往往最常读取的，也是读取次数最多的，所以，利用LRU缓存，我们能够提高系统的性能。
+(2) 为什么是LinkedHashMap
+第一，它的数据结构包含一个双向链表，其源代码片段如下：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class='java'><span class='line'><span class="kd">public</span> <span class="kd">class</span> <span class="nc">LinkedHashMap</span><span class="o">&lt;</span><span class="n">K</span><span class="o">,</span><span class="n">V</span><span class="o">&gt;</span>  <span class="kd">extends</span> <span class="n">HashMap</span><span class="o">&lt;</span><span class="n">K</span><span class="o">,</span><span class="n">V</span><span class="o">&gt;</span>  <span class="kd">implements</span> <span class="n">Map</span><span class="o">&lt;</span><span class="n">K</span><span class="o">,</span><span class="n">V</span><span class="o">&gt;</span> <span class="o">{</span>
+</span><span class='line'>    <span class="cm">/**</span>
+</span><span class='line'><span class="cm">     * The head of the doubly linked list.</span>
+</span><span class='line'><span class="cm">     */</span>
+</span><span class='line'>    <span class="kd">private</span> <span class="kd">transient</span> <span class="n">Entry</span><span class="o">&lt;</span><span class="n">K</span><span class="o">,</span><span class="n">V</span><span class="o">&gt;</span> <span class="n">header</span><span class="o">;</span>
+</span><span class='line'><span class="err">其中</span><span class="n">Entry</span><span class="err">的定义的代码片段如下：</span>
+</span><span class='line'><span class="cm">/**                                                                       </span>
+</span><span class='line'><span class="cm"> * LinkedHashMap entry.                                                   </span>
+</span><span class='line'><span class="cm"> */</span>
+</span><span class='line'><span class="kd">private</span> <span class="kd">static</span> <span class="kd">class</span> <span class="nc">Entry</span><span class="o">&lt;</span><span class="n">K</span><span class="o">,</span><span class="n">V</span><span class="o">&gt;</span> <span class="kd">extends</span> <span class="n">HashMap</span><span class="o">.</span><span class="na">Entry</span><span class="o">&lt;</span><span class="n">K</span><span class="o">,</span><span class="n">V</span><span class="o">&gt;</span> <span class="o">{</span>
+</span><span class='line'>    <span class="c1">// These fields comprise the doubly linked list used for iteration.   </span>
+</span><span class='line'>    <span class="n">Entry</span><span class="o">&lt;</span><span class="n">K</span><span class="o">,</span><span class="n">V</span><span class="o">&gt;</span> <span class="n">before</span><span class="o">,</span> <span class="n">after</span><span class="o">;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>可见这个双向链表就具备了实现LRU的基础，每次访问LinkedHashMap里的元素或者向LinkedHashMap里添加元素时，都会更新这个双向链表，让其header永远指向最少使用的元素，其代码实现可以参考LinkedHashMap的源代码。
+第二，LinkedHashMap本身有一个方法用于判断是否需要移除最少使用的元素，但是，原始方法默认不需要移除，该方法实现的源代码如下：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class='java'><span class='line'><span class="kd">protected</span> <span class="kt">boolean</span> <span class="nf">removeEldestEntry</span><span class="o">(</span><span class="n">Map</span><span class="o">.</span><span class="na">Entry</span><span class="o">&lt;</span><span class="n">K</span><span class="o">,</span><span class="n">V</span><span class="o">&gt;</span> <span class="n">eldest</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>        <span class="k">return</span> <span class="kc">false</span><span class="o">;</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>               <br/>
+实际使用中，可以将header指向的最少使用的元素作为该方法的入参，然后重写方法  removeEldestEntry，可以根据自己的条件来决定是否删除该元素。
+(3) 实现样例
+基于以上的分析，下面给出一个简单的LUR缓存的实现样例，代码如下：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+</pre></td><td class='code'><pre><code class='java'><span class='line'><span class="kd">public</span> <span class="kd">class</span> <span class="nc">LRULinkedHashMap</span><span class="o">&lt;</span><span class="n">K</span><span class="o">,</span> <span class="n">V</span><span class="o">&gt;</span> <span class="kd">extends</span> <span class="n">LinkedHashMap</span><span class="o">&lt;</span><span class="n">K</span><span class="o">,</span> <span class="n">V</span><span class="o">&gt;</span> <span class="o">{</span>
+</span><span class='line'>  <span class="cm">/** serialVersionUID */</span>
+</span><span class='line'>  <span class="kd">private</span> <span class="kd">static</span> <span class="kd">final</span> <span class="kt">long</span> <span class="n">serialVersionUID</span> <span class="o">=</span> <span class="o">-</span><span class="mi">5933045562735378538L</span><span class="o">;</span>
+</span><span class='line'>  <span class="cm">/** 最大数据存储容量 */</span>
+</span><span class='line'>  <span class="kd">private</span> <span class="kd">static</span> <span class="kd">final</span> <span class="kt">int</span> <span class="n">LRU_MAX_CAPACITY</span> <span class="o">=</span> <span class="mi">1024</span><span class="o">;</span>
+</span><span class='line'>  <span class="cm">/** 剩余内存空间的阈值，设置的为50M */</span>
+</span><span class='line'>  <span class="kd">private</span> <span class="kd">static</span> <span class="kd">final</span> <span class="kt">int</span> <span class="n">SPACE_THRESHOLD</span> <span class="o">=</span> <span class="mi">50</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="o">;</span>
+</span><span class='line'><span class="cm">/** 存储数据容量 */</span>
+</span><span class='line'>  <span class="kd">private</span> <span class="kt">int</span> <span class="n">capacity</span><span class="o">;</span>
+</span><span class='line'>  <span class="kd">public</span> <span class="nf">LRULinkedHashMap</span><span class="o">()</span> <span class="o">{</span>
+</span><span class='line'>      <span class="kd">super</span><span class="o">();</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="cm">/**</span>
+</span><span class='line'><span class="cm">     * 带参数构造方法</span>
+</span><span class='line'><span class="cm">     * </span>
+</span><span class='line'><span class="cm">     * @param initialCapacity 容量</span>
+</span><span class='line'><span class="cm">     * @param loadFactor 装载因子</span>
+</span><span class='line'><span class="cm">     * @param isLRU 是否使用lru算法，true：使用（按方案顺序排序）;false：不使用（按存储顺序排序）</span>
+</span><span class='line'><span class="cm">     */</span>
+</span><span class='line'>  <span class="kd">public</span> <span class="nf">LRULinkedHashMap</span><span class="o">(</span><span class="kt">int</span> <span class="n">initialCapacity</span><span class="o">,</span> <span class="kt">float</span> <span class="n">loadFactor</span><span class="o">,</span> <span class="kt">boolean</span> <span class="n">isLRU</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>      <span class="kd">super</span><span class="o">(</span><span class="n">initialCapacity</span><span class="o">,</span> <span class="n">loadFactor</span><span class="o">,</span> <span class="kc">true</span><span class="o">);</span>
+</span><span class='line'>      <span class="n">capacity</span> <span class="o">=</span> <span class="n">LRU_MAX_CAPACITY</span><span class="o">;</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="cm">/**</span>
+</span><span class='line'><span class="cm">     * 带参数构造方法</span>
+</span><span class='line'><span class="cm">     * </span>
+</span><span class='line'><span class="cm">     * @param initialCapacity 容量</span>
+</span><span class='line'><span class="cm">     * @param loadFactor 装载因子</span>
+</span><span class='line'><span class="cm">     * @param isLRU 是否使用lru算法，true：使用（按方案顺序排序）;false：不使用（按存储顺序排序）</span>
+</span><span class='line'><span class="cm">     * @param lruCapacity  lru存储数据容量</span>
+</span><span class='line'><span class="cm">     */</span>
+</span><span class='line'>  <span class="kd">public</span> <span class="nf">LRULinkedHashMap</span><span class="o">(</span><span class="kt">int</span> <span class="n">initialCapacity</span><span class="o">,</span> <span class="kt">float</span> <span class="n">loadFactor</span><span class="o">,</span>
+</span><span class='line'>          <span class="kt">boolean</span> <span class="n">isLRU</span><span class="o">,</span> <span class="kt">int</span> <span class="n">lruCapacity</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>      <span class="kd">super</span><span class="o">(</span><span class="n">initialCapacity</span><span class="o">,</span> <span class="n">loadFactor</span><span class="o">,</span> <span class="kc">true</span><span class="o">);</span>
+</span><span class='line'>      <span class="k">this</span><span class="o">.</span><span class="na">capacity</span> <span class="o">=</span> <span class="n">lruCapacity</span><span class="o">;</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="nd">@Override</span>
+</span><span class='line'>  <span class="kd">protected</span> <span class="kt">boolean</span> <span class="nf">removeEldestEntry</span><span class="o">(</span><span class="n">Entry</span><span class="o">&lt;</span><span class="n">K</span><span class="o">,</span> <span class="n">V</span><span class="o">&gt;</span> <span class="n">eldest</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>      <span class="k">if</span> <span class="o">(</span><span class="n">capacity</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="o">&amp;&amp;</span> <span class="n">size</span><span class="o">()</span> <span class="o">&gt;</span> <span class="n">capacity</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>          <span class="k">return</span> <span class="kc">true</span><span class="o">;</span>
+</span><span class='line'>      <span class="o">}</span> <span class="k">else</span> <span class="k">if</span> <span class="o">(</span><span class="n">Runtime</span><span class="o">.</span><span class="na">getRuntime</span><span class="o">().</span><span class="na">freeMemory</span><span class="o">()</span> <span class="o">&lt;</span> <span class="n">SPACE_THRESHOLD</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>          <span class="k">return</span> <span class="kc">true</span><span class="o">;</span>
+</span><span class='line'>      <span class="o">}</span>
+</span><span class='line'>      <span class="k">return</span> <span class="kc">false</span><span class="o">;</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'>  <span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+</div>
+  
+  
+
+
+    </article>
+  
   <div class="pagination">
     
     <a href="/blog/archives">Blog Archives</a>
@@ -642,6 +1358,10 @@ JVM并不需要为此机制作出改动。编译器通过内联函数和扩展�
     
       <li class="post">
         <a href="/blog/2014/06/09/java-exception/">关于Java异常的那些事儿</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/06/09/java-collection/">关于Java集合的那些事儿</a>
       </li>
     
   </ul>
