@@ -4,7 +4,7 @@
   <title><![CDATA[CRO-成都学习天地]]></title>
   <link href="http://crochengdu.github.io/atom.xml" rel="self"/>
   <link href="http://crochengdu.github.io/"/>
-  <updated>2014-05-03T16:49:26+08:00</updated>
+  <updated>2014-06-09T12:54:59+08:00</updated>
   <id>http://crochengdu.github.io/</id>
   <author>
     <name><![CDATA[运营支撑团队]]></name>
@@ -12,5 +12,540 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[关于Java异常的那些事儿]]></title>
+    <link href="http://crochengdu.github.io/blog/2014/06/09/java-exception/"/>
+    <updated>2014-06-09T10:32:40+08:00</updated>
+    <id>http://crochengdu.github.io/blog/2014/06/09/java-exception</id>
+    <content type="html"><![CDATA[<h1>一、 Exception</h1>
+
+<h2>1.    Exception定义</h2>
+
+<p>在有充足理由将某情况视为该方法的典型功能（typical functioning ）部分时，避免使用异常。　因此，意外情况就是指方法的“正常功能”（normal functioning）之外的情况。</p>
+
+<h2>2.    Exception分类</h2>
+
+<p>Checked Exception:  Java.lang.Exception的子类,方法签名上需要显示的声明throws，编译器迫使调用者处理这类异常或者声明throws继续往上抛。主要是对付那些可以恢复过来的场景。</p>
+
+<p>Unchecked Exception:  RuntimeException的子类，方法签名不需要声明throws，编译器也不会强制调用者处理该类异常。主要用于那些无法恢复的场景。</p>
+
+<p>当要决定是采用checked exception还是Unchecked exception的时候，你要问自己一个问题，&#8221;如果这种异常一旦抛出，客户端会做怎样的补救？&#8221;
+如果客户端可以通过其他的方法恢复异常，那么这种异常就是checked exception；
+如果客户端对出现的这种异常无能为力，那么这种异常就是Unchecked exception；从使用上讲，当异常出现的时候要做一些试图恢复它的动作而不要仅仅的打印它的信息。</p>
+
+<h2>3.    异常的优缺点</h2>
+
+<p>优点：</p>
+
+<pre><code>    1). 分离错误代码和正常代码，代码更简洁。 
+    2). 保护数据的正确性和完整性，程序更严谨及更健壮。 
+    3). 便于调试和排错，软件更好维护。
+</code></pre>
+
+<p>缺点：
+1). 过度或者错误使用异常会导致消耗过多的资源。
+2). 有些被定义为Checked Exception的，在某些情况下并不被视为异常情况。</p>
+
+<h2>4.    异常处理原则：</h2>
+
+<p>第1条: 只针对不正常的情况才使用异常
+1)  异常应该只用于异常的情况下，不该用于正常的控制流
+2)  设计良好的API不应该强迫它的客户端为了正常的控制流而使用异常，可以提供状态测试（hashNext()）或者可识别的返回值(return null)。</p>
+
+<p>第2条: 对于可恢复的条件使用被检查的异常，对于程序错误使用运行时异常
+java有三种可抛出的结构（throwable），受检的异常（checked exception）、运行时异常（run-time exception）和错误（error）。</p>
+
+<p>第3条: 避免不必要的使用被检查的异常
+如果正确地使用API并不能阻止这种异常条件的产生，并且一旦产生异常，使用API的程序员可以立即采取有用的动作，这种负担就被认为是正当的。除非这两个条件都成立，否则更适合于使用未受检的异常
+第4条: 尽量使用标准的异常
+第5条: 抛出的异常要适合于相应的抽象
+1)  更高层的实现应该捕获低层的异常，同时抛出可以按照高层抽象进行解释的异常，即异常转译（Exception translation）
+2)  异常链，低层的异常对于调试导致高层异常的问题有帮助的时候使用
+3)  尽管异常转译与不加选择第从底层传递异常的做法相比有所改进，但是它也不能被滥用。如果可能，处理来自低层异常的最好做法是，在调用低层方法之前确保它们会成功执行，从而避免它们抛出异常。如在给低层传递参数之前，检查高层参数有效性，从而避免低层抛出异常
+4)  如果无法避免低层异常，次选是，让更高层来悄悄绕开这些异常，从而将高层方法的调用者与低层的问题隔离开来。如使用java.util.logging将异常记录下来。</p>
+
+<p>第6条: 每个方法抛出的 异常都要有文档
+第7条: 在细节消息中包含失败 &mdash; 捕获消息
+第8条: 努力使失败保持原子性，一般而言，失败的方法调用应该使对象保持在被调用之前的状态。具有这种熟悉的方法被成为具有失败原子性（failure atomic）。
+1)  最简单的办法莫过于设计一个不可变的对象，如果对象不可变，失败原子性就是显然的了
+2)  对于在可变对象上执行操作的方法，获得原子性最常见的办法是，在执行操作之前检查参数的有效性。
+3)  做恢复代码，回滚
+4)  在对象的临时拷贝上进行操作，完成之后在用临时拷贝中的结构代替对象的内容。
+5)  一般而言，作为方法规范的一部分，产生任何异常都应该让对象保持在该方法调用之前的状态。如果违反这条规则，API文档就应该清楚地指明对象将会处于什么样的状态。</p>
+
+<p>第9条: 不要忽略异常
+1)  当api的设计者声明一个方法将抛出某个异常的时候，他们等于正在试图说明某些事情，因此不要忽略它。
+2)  空的catch使异常达不到应有的目的，至少，catch块也应该保护一条说明，解释为什么可以忽略这个异常</p>
+
+<h2>5.    Exception实例</h2>
+
+<h3>5.1  Exception顺序</h3>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class='java'><span class='line'><span class="k">try</span> <span class="o">{</span>
+</span><span class='line'>      <span class="k">throw</span> <span class="k">new</span> <span class="nf">FileNotFoundException</span><span class="o">();</span>
+</span><span class='line'>  <span class="o">}</span>  <span class="k">catch</span> <span class="o">(</span><span class="n">FileNotFoundException</span> <span class="n">file</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>      <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">&quot;File Not Found Exception&quot;</span><span class="o">);</span>
+</span><span class='line'>  <span class="o">}</span> <span class="k">catch</span> <span class="o">(</span><span class="n">IOException</span> <span class="n">io</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>      <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">&quot;IO Exception&quot;</span><span class="o">);</span>
+</span><span class='line'>  <span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>IOException 只会catch住非FileNotFoundException以外的exception, 交换2个位置，是会编译出错的，会提示FileNotFoundException已经被catch住了。</p>
+
+<h3>5.2  Exception Wrapper</h3>
+
+<p> Exception Wrapper, 聚合这些exception, 在调用栈的顶部，封装下exception, 让上次不要知道底层这么多细节。</p>
+
+<p>如果在catch或者finally的时候，抛出一个exception, 那么这个exception hide住了本来catch住的exception.</p>
+
+<p>不好的实例：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class='java'><span class='line'><span class="n">InputStream</span> <span class="n">input</span> <span class="o">=</span> <span class="kc">null</span><span class="o">;</span>
+</span><span class='line'>  <span class="k">try</span><span class="o">{</span>
+</span><span class='line'>    <span class="n">input</span> <span class="o">=</span> <span class="k">new</span> <span class="n">FileInputStream</span><span class="o">(</span><span class="s">&quot;myFile.txt&quot;</span><span class="o">);</span>
+</span><span class='line'>    <span class="c1">//do something with the stream</span>
+</span><span class='line'>  <span class="o">}</span> <span class="k">catch</span><span class="o">(</span><span class="n">IOException</span> <span class="n">e</span><span class="o">){</span>
+</span><span class='line'>    <span class="k">throw</span> <span class="k">new</span> <span class="nf">WrapperException</span><span class="o">(</span><span class="n">e</span><span class="o">);</span>
+</span><span class='line'>  <span class="o">}</span> <span class="k">finally</span> <span class="o">{</span>
+</span><span class='line'>    <span class="k">try</span><span class="o">{</span>
+</span><span class='line'>     <span class="n">input</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+</span><span class='line'>    <span class="o">}</span> <span class="k">catch</span><span class="o">(</span><span class="n">IOException</span> <span class="n">e</span><span class="o">){</span>
+</span><span class='line'>       <span class="k">throw</span> <span class="k">new</span> <span class="nf">WrapperException</span><span class="o">(</span><span class="n">e</span><span class="o">);</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'>  <span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>正确的写法：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class='java'><span class='line'><span class="k">try</span><span class="o">{</span>
+</span><span class='line'>    <span class="n">input</span> <span class="o">=</span> <span class="k">new</span> <span class="n">FileInputStream</span><span class="o">(</span><span class="s">&quot;myFile.txt&quot;</span><span class="o">);</span>
+</span><span class='line'>    <span class="c1">//do something with the stream</span>
+</span><span class='line'>  <span class="o">}</span> <span class="k">catch</span><span class="o">(</span><span class="n">IOException</span> <span class="n">e</span><span class="o">){</span> <span class="c1">//first catch block</span>
+</span><span class='line'>    <span class="k">throw</span> <span class="k">new</span> <span class="nf">WrapperException</span><span class="o">(</span><span class="n">e</span><span class="o">);</span>
+</span><span class='line'>  <span class="o">}</span> <span class="k">finally</span> <span class="o">{</span>
+</span><span class='line'>    <span class="k">try</span><span class="o">{</span>
+</span><span class='line'>     <span class="k">if</span><span class="o">(</span><span class="n">input</span> <span class="o">!=</span> <span class="kc">null</span><span class="o">)</span> <span class="n">input</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+</span><span class='line'>    <span class="o">}</span> <span class="k">catch</span><span class="o">(</span><span class="n">IOException</span> <span class="n">e</span><span class="o">){</span>  <span class="c1">//second catch block</span>
+</span><span class='line'>       <span class="k">throw</span> <span class="k">new</span> <span class="nf">WrapperException</span><span class="o">(</span><span class="n">e</span><span class="o">);</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'>  <span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>我们必须保证的是，最后一个exception必须throw 所有exceptions情况，其实这还不是最复杂的情况。在jdbc transations里面，情况更为复杂。</p>
+
+<h3>5.3   UndeclaredThrowableException</h3>
+
+<p>JDK的java doc是这么解释UndeclaredThrowableException的：
+<a href="http://download.oracle.com/technetwork/java/javase/6/docs/zh/api/java/lang/reflect/UndeclaredThrowableException.html">http://download.oracle.com/technetwork/java/javase/6/docs/zh/api/java/lang/reflect/UndeclaredThrowableException.html</a>
+英文版的：
+<a href="http://pic.dhe.ibm.com/infocenter/adiehelp/v5r1m1/index.jsp?topic=%2Fcom.sun.api.doc%2Fjava%2Flang%2Freflect%2FUndeclaredThrowableException.html">http://pic.dhe.ibm.com/infocenter/adiehelp/v5r1m1/index.jsp?topic=%2Fcom.sun.api.doc%2Fjava%2Flang%2Freflect%2FUndeclaredThrowableException.html</a></p>
+
+<p>明白了什么是UndeclaredThrowableException后，那我就查我的代码中时什么原因导致了这个exception：
+这是因为通过反射调用抛出的异常被代理类包装为UndeclaredThrowableException
+这个异常总共途径了一下几个系统：
+RPC client(源头)&mdash;&ndash;>我的应用&mdash;&mdash;>Web容器(容器层)
+那么我们来分析下，分别在那一层处理这个异常比较合适。
+1、 源头RPC client层：我认为，判断一处代码是应该处理异常还是将异常抛出，取决于其是否获取了异常信息后，能如何应对？如果其能针对捕捉到的异常做出符合业务逻辑需要的处理，那么就不应该将异常继续抛出，反之，则抛出异常。比如上面的TimeOutException，不同应用的业务逻辑有不同的处理办法，而RPC Client端并不知道这个具体的情况，所以RPC Client不需要处理这类异常，将其继续抛出即可。越接近异常的源头，处理异常最方便（此处的方便，指的是，在接近于源头的底层框架处理异常，那么对调用这些框架的应用代码来说，就不需要关注异常处理了，这就方便了
+2、 应用层：那么是不是需要在应用层做处理呢？这里需要具体情况具体分析。拿我这个应用来说，这是一个web应用，就算我这个应用对runtimeException不做处理，web容器也会对这个异常进行处理，并不会造成程序的崩溃。但是如果应用层不是web项目，或者应用不是依托在某个容器内，那如果应用层不对这个异常进行处理的话，就没人处理这个异常了，就会直接抛出一个RuntimeException，导致程序挂掉。因此我认为，如果我们在应用中调用RPC等之类的服务，要注意一下几点：
+此处的调用抛了UndeclaredThrowableException，需要额外的处理不?
+如果需要，就要在此处捕捉到这个异常；
+如果不需要，那么就要想想，我们的应用把这个异常抛出去，接下来会不会有地方来处理这个异常，如果有，则可以继续抛出？
+如果我们的应用已经是异常处理链中的最后一环，那么还是要把这个异常捕捉住。
+如果有Web容器之类的罩着，我们可以把这个异常继续传递下去。
+如果在应用中要处理异常，应该考虑的全面细致。是否需要降级？该流程是否是必须流程，如果是必须流程是否还会涉及到业务回滚，如果是非必须流程如何在产生异常时不影响当前业务。是否需要容灾？
+3、 Web容器：上面说了，如果是Web项目，容器会处理应用抛出的RuntimeException，就像上面图展示的 Webx3容器（jboss）的默认Error页面。
+另外， 对于RPC之类等涉及网络的服务调用，需要养成一个多思考一点的异常处理的编程习惯。</p>
+
+<h3>5.4  异常的性能问题</h3>
+
+<p>1)  问题存在
+是否使用异常来控制业务流程，是个比较争议的话题。支持的人认为，使用业务异常来控制业务流程，代码逻辑清晰，反对的人认为异常消耗太多资源，对系统的性能有影响。那我们做个测试，看看异常是否会影响性能。
+首先定义一个普通的业务异常，代码如下:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class='java'><span class='line'><span class="kd">public</span> <span class="kd">class</span> <span class="nc">BusinessException</span> <span class="kd">extends</span> <span class="n">Exception</span> <span class="o">{</span>
+</span><span class='line'>    <span class="kd">private</span> <span class="kd">static</span> <span class="kd">final</span> <span class="kt">long</span> <span class="n">serialVersionUID</span> <span class="o">=</span> <span class="mi">8186919518812720632L</span><span class="o">;</span>
+</span><span class='line'>    <span class="kd">public</span> <span class="nf">BusinessException</span><span class="o">(</span><span class="n">String</span> <span class="n">message</span><span class="o">,</span> <span class="n">Throwable</span> <span class="n">cause</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>        <span class="kd">super</span><span class="o">(</span><span class="n">message</span><span class="o">,</span> <span class="n">cause</span><span class="o">);</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'>    <span class="kd">public</span> <span class="nf">BusinessException</span><span class="o">(</span><span class="n">String</span> <span class="n">message</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>        <span class="kd">super</span><span class="o">(</span><span class="n">message</span><span class="o">);</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>然后测试对比，生成业务异常对象和生成普通对象的耗时分别是多少，代码如下:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class='java'><span class='line'><span class="kt">long</span> <span class="n">startTime</span> <span class="o">=</span> <span class="n">System</span><span class="o">.</span><span class="na">currentTimeMillis</span><span class="o">();</span>
+</span><span class='line'><span class="k">for</span> <span class="o">(</span><span class="kt">int</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="o">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="mi">2000000</span><span class="o">;</span> <span class="n">i</span><span class="o">++)</span> <span class="o">{</span>
+</span><span class='line'>    <span class="k">new</span> <span class="n">HashMap</span><span class="o">&lt;</span><span class="n">String</span><span class="o">,</span> <span class="n">String</span><span class="o">&gt;();</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'><span class="kt">long</span> <span class="n">endTime</span> <span class="o">=</span> <span class="n">System</span><span class="o">.</span><span class="na">currentTimeMillis</span><span class="o">();</span>
+</span><span class='line'><span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">&quot;HashMap:&quot;</span> <span class="o">+</span> <span class="o">(</span><span class="n">endTime</span> <span class="o">-</span> <span class="n">startTime</span><span class="o">));</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">startTime</span> <span class="o">=</span> <span class="n">System</span><span class="o">.</span><span class="na">currentTimeMillis</span><span class="o">();</span>
+</span><span class='line'><span class="k">for</span> <span class="o">(</span><span class="kt">int</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="o">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="mi">2000000</span><span class="o">;</span> <span class="n">i</span><span class="o">++)</span> <span class="o">{</span>
+</span><span class='line'>    <span class="k">new</span> <span class="nf">BusinessException</span><span class="o">(</span><span class="s">&quot;exception test&quot;</span><span class="o">);</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'><span class="n">endTime</span> <span class="o">=</span> <span class="n">System</span><span class="o">.</span><span class="na">currentTimeMillis</span><span class="o">();</span>
+</span><span class='line'><span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">&quot;BusinessException:&quot;</span> <span class="o">+</span> <span class="o">(</span><span class="n">endTime</span> <span class="o">-</span> <span class="n">startTime</span><span class="o">));</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>最后的执行结果如下：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class='java'><span class='line'><span class="nl">HashMap:</span><span class="mi">24</span>
+</span><span class='line'><span class="nl">BusinessException:</span><span class="mi">916</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>2)  原因分析
+可见生成普通HashMap对象和普通业务异常对象的耗时不在一个数量级，那我们看看生成业务异常对象，做了哪些事情，查看Exception的父类Throwable的构造函数，发现构造普通业务异常对象的时候，会调用synchronized声明的方法fillInStackTrace，代码如下：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class='java'><span class='line'><span class="kd">public</span> <span class="nf">Throwable</span><span class="o">(</span><span class="n">String</span> <span class="n">message</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>        <span class="n">fillInStackTrace</span><span class="o">();</span>
+</span><span class='line'>        <span class="n">detailMessage</span> <span class="o">=</span> <span class="n">message</span><span class="o">;</span>
+</span><span class='line'>    <span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>性能的主要开销就在这个方法，作用是填充线程运行堆栈信息，其实定义业务异常是为了用于控制业务逻辑，为可检查异常，其堆栈信息没有多大用处，生成业务异常的时候，没有必要填充堆栈信息。
+3)  解决方法
+对BusinessException做了改进，代码如下：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class='java'><span class='line'><span class="kd">public</span> <span class="kd">class</span> <span class="nc">SterilizedBusinessException</span> <span class="kd">extends</span> <span class="n">Exception</span> <span class="o">{</span>
+</span><span class='line'>    <span class="kd">private</span> <span class="kd">static</span> <span class="kd">final</span> <span class="kt">long</span> <span class="n">serialVersionUID</span> <span class="o">=</span> <span class="o">-</span><span class="mi">722749368211888466L</span><span class="o">;</span>
+</span><span class='line'>    <span class="kd">public</span> <span class="nf">SterilizedBusinessException</span><span class="o">(</span><span class="n">String</span> <span class="n">message</span><span class="o">,</span> <span class="n">Throwable</span> <span class="n">cause</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>        <span class="kd">super</span><span class="o">(</span><span class="n">message</span><span class="o">,</span> <span class="n">cause</span><span class="o">);</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'>    <span class="kd">public</span> <span class="nf">SterilizedBusinessException</span><span class="o">(</span><span class="n">String</span> <span class="n">message</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>        <span class="kd">super</span><span class="o">(</span><span class="n">message</span><span class="o">);</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'>    <span class="nd">@Override</span>
+</span><span class='line'>    <span class="kd">public</span> <span class="n">Throwable</span> <span class="nf">fillInStackTrace</span><span class="o">()</span> <span class="o">{</span>
+</span><span class='line'>        <span class="k">return</span> <span class="kc">null</span><span class="o">;</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>对方法fillInStackTrace进行了重写，此时我们再测试一次，结果如下：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class='java'><span class='line'><span class="nl">HashMap:</span><span class="mi">25</span>
+</span><span class='line'><span class="nl">BusinessException:</span><span class="mi">23</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>此时就不会因为业务异常而影响系统性能。</p>
+
+<h3>5.5  运行时异常和可检查异常的差别</h3>
+
+<p>这个差别主要表现在编程时和运行时，编程时差别大家都比较清楚， checked异常总是需要显式处理，
+而unchecked异常可以选择性处理，那么在运行时呢，这两个异常JVM处理上面是否存在很大的差异？
+1)  Java文件：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+</pre></td><td class='code'><pre><code class='java'><span class='line'><span class="kn">package</span> <span class="n">com</span><span class="o">.</span><span class="na">test</span><span class="o">.</span><span class="na">jingchu</span><span class="o">;</span>
+</span><span class='line'>
+</span><span class='line'><span class="kd">public</span> <span class="kd">class</span> <span class="nc">ExceptionTest2</span> <span class="o">{</span>
+</span><span class='line'>    <span class="kd">public</span> <span class="kd">static</span> <span class="kt">void</span> <span class="nf">main</span><span class="o">(</span><span class="n">String</span><span class="o">[]</span> <span class="n">args</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>        <span class="k">try</span> <span class="o">{</span>
+</span><span class='line'>            <span class="n">getResult1</span><span class="o">();</span>
+</span><span class='line'>        <span class="o">}</span> <span class="k">catch</span> <span class="o">(</span><span class="n">MyException</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>            <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">&quot;MyException&quot;</span><span class="o">);</span>
+</span><span class='line'>        <span class="o">}</span>
+</span><span class='line'>        <span class="k">try</span> <span class="o">{</span>
+</span><span class='line'>            <span class="n">getResult2</span><span class="o">();</span>
+</span><span class='line'>        <span class="o">}</span> <span class="k">catch</span> <span class="o">(</span><span class="n">IllegalArgumentException</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>            <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">&quot;IllegalArgumentException&quot;</span><span class="o">);</span>
+</span><span class='line'>        <span class="o">}</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="kd">public</span> <span class="kd">static</span> <span class="n">String</span> <span class="nf">getResult1</span><span class="o">()</span> <span class="kd">throws</span> <span class="n">MyException</span> <span class="o">{</span>
+</span><span class='line'>        <span class="k">throw</span> <span class="k">new</span> <span class="nf">MyException</span><span class="o">();</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="kd">public</span> <span class="kd">static</span> <span class="n">String</span> <span class="nf">getResult2</span><span class="o">()</span> <span class="o">{</span>
+</span><span class='line'>        <span class="k">throw</span> <span class="k">new</span> <span class="nf">IllegalArgumentException</span><span class="o">();</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>2)  class阉割
+将编译好的class 文件使用二进制方式打开，找到如下位置：
+<img class="center" src="http://crochengdu.github.io/images/class1.png" width="380" height="320"></p>
+
+<p>我们 将绿色部分修改成0001 ， 将红色部分删除：
+<img class="center" src="http://crochengdu.github.io/images/class2.png" width="380" height="320"></p>
+
+<p>3)  反编译
+将该class 反编译成java :
+<img class="center" src="http://crochengdu.github.io/images/class3.png" width="380" height="320">
+我们会发现 getResult1() 的方法的throws 信息被我们阉割掉了。
+4)  运行
+继续运行该class 打印结果：
+<img class="center" src="http://crochengdu.github.io/images/class4.png" width="380" height="320">
+5)  结论
+checked 异常的throws 语句不影响class 文件的加载，且在运行时JVM没有区分这两类异常。也就是说异常机制其实在运行设计上面是没有任何差别的， 但是在使用设计上面却存在很大的差别。</p>
+
+<h2>6.    Java-7中新增exception特性</h2>
+
+<h3>6.1    特性一 Java 7 Try-with-resourcce</h3>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+</pre></td><td class='code'><pre><code class='java'><span class='line'><span class="kd">private</span> <span class="kd">static</span> <span class="kt">void</span> <span class="nf">printFile</span><span class="o">()</span> <span class="kd">throws</span> <span class="n">IOException</span> <span class="o">{</span>
+</span><span class='line'>    <span class="n">InputStream</span> <span class="n">input</span> <span class="o">=</span> <span class="kc">null</span><span class="o">;</span>
+</span><span class='line'>    <span class="k">try</span> <span class="o">{</span>
+</span><span class='line'>        <span class="n">input</span> <span class="o">=</span> <span class="k">new</span> <span class="n">FileInputStream</span><span class="o">(</span><span class="s">&quot;file.txt&quot;</span><span class="o">);</span>
+</span><span class='line'>        <span class="kt">int</span> <span class="n">data</span> <span class="o">=</span> <span class="n">input</span><span class="o">.</span><span class="na">read</span><span class="o">();</span>
+</span><span class='line'>        <span class="k">while</span><span class="o">(</span><span class="n">data</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="o">){</span>
+</span><span class='line'>            <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">print</span><span class="o">((</span><span class="kt">char</span><span class="o">)</span> <span class="n">data</span><span class="o">);</span>
+</span><span class='line'>            <span class="n">data</span> <span class="o">=</span> <span class="n">input</span><span class="o">.</span><span class="na">read</span><span class="o">();</span>
+</span><span class='line'>        <span class="o">}</span>
+</span><span class='line'>    <span class="o">}</span> <span class="k">finally</span> <span class="o">{</span>
+</span><span class='line'>        <span class="o">}</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>        <span class="k">if</span><span class="o">(</span><span class="n">input</span> <span class="o">!=</span> <span class="kc">null</span><span class="o">){</span>
+</span><span class='line'>            <span class="n">input</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+</span><span class='line'>        <span class="o">}</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>在JSR 334, Project Coin</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class='java'><span class='line'><span class="kd">private</span> <span class="kd">static</span> <span class="kt">void</span> <span class="nf">printFileJava7</span><span class="o">()</span> <span class="kd">throws</span> <span class="n">IOException</span> <span class="o">{</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="k">try</span><span class="o">(</span><span class="n">FileInputStream</span> <span class="n">input</span> <span class="o">=</span> <span class="k">new</span> <span class="n">FileInputStream</span><span class="o">(</span><span class="s">&quot;file.txt&quot;</span><span class="o">))</span> <span class="o">{</span>
+</span><span class='line'>
+</span><span class='line'>        <span class="kt">int</span> <span class="n">data</span> <span class="o">=</span> <span class="n">input</span><span class="o">.</span><span class="na">read</span><span class="o">();</span>
+</span><span class='line'>        <span class="k">while</span><span class="o">(</span><span class="n">data</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="o">){</span>
+</span><span class='line'>            <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">print</span><span class="o">((</span><span class="kt">char</span><span class="o">)</span> <span class="n">data</span><span class="o">);</span>
+</span><span class='line'>            <span class="n">data</span> <span class="o">=</span> <span class="n">input</span><span class="o">.</span><span class="na">read</span><span class="o">();</span>
+</span><span class='line'>        <span class="o">}</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>这个FileInputStream会在try block完成时，被自动关掉，因为FileInputStream实现了Java.lang.AutoCloseable接口，所有class实现了这个接口，都可以用在try-with-resources结果里面。</p>
+
+<p>当多个Resouces申明了以后，</p>
+
+<pre><code>try( FileInputStream   input    = new FileInputStream("file.txt");
+        BufferedInputStream bufferedInput = new BufferedInputStream(input)
+   ) {
+</code></pre>
+
+<p>input, bufferedInput都会自动关闭，但是他们关闭的顺序正好和他们申明顺序相反。</p>
+
+<h3>6.2    特性二 Java7 之前我们catch住多个Exception</h3>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class='java'><span class='line'><span class="k">try</span> <span class="o">{</span>
+</span><span class='line'>    <span class="c1">// execute code that may throw 1 of the 3 exceptions below.</span>
+</span><span class='line'><span class="o">}</span> <span class="k">catch</span><span class="o">(</span><span class="n">SQLException</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>    <span class="n">logger</span><span class="o">.</span><span class="na">log</span><span class="o">(</span><span class="n">e</span><span class="o">);</span>
+</span><span class='line'><span class="o">}</span> <span class="k">catch</span><span class="o">(</span><span class="n">IOException</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>    <span class="n">logger</span><span class="o">.</span><span class="na">severe</span><span class="o">(</span><span class="n">e</span><span class="o">);</span>
+</span><span class='line'><span class="o">}</span><span class="k">catch</span><span class="o">(</span><span class="n">Exception</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>    <span class="n">logger</span><span class="o">.</span><span class="na">severe</span><span class="o">(</span><span class="n">e</span><span class="o">);</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Java 7之后 我们可以用</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class='java'><span class='line'><span class="k">try</span> <span class="o">{</span>
+</span><span class='line'>    <span class="c1">// execute code that may throw 1 of the 3 exceptions below.</span>
+</span><span class='line'><span class="o">}</span> <span class="k">catch</span><span class="o">(</span><span class="n">SQLException</span> <span class="o">|</span> <span class="n">IOException</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>    <span class="n">logger</span><span class="o">.</span><span class="na">log</span><span class="o">(</span><span class="n">e</span><span class="o">);</span>
+</span><span class='line'><span class="o">}</span> <span class="k">catch</span><span class="o">(</span><span class="n">Exception</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>    <span class="n">logger</span><span class="o">.</span><span class="na">severe</span><span class="o">(</span><span class="n">e</span><span class="o">);</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>如果用一个比较大的父类的Exception, 这会造成上层用户，很难知道到底发生了什么。
+7.  异常实现原理（JVM）
+JVM对异常的处理主要是基于异常表(Exception Table)，每个包含了try的方法在编译后除字节码外，都会产生一个附加的数据结构&mdash;异常表，异常表结构如下：</p>
+
+<pre><code>{
+    {PC:BEGIN, PC:END, PC:HANDLER, EXCEPTION-TYPE}
+}
+PC:BEGIN-PC:END 代表异常发生的PC值的范围
+EXCEPTION-TYPE   代表异常捕获的类型
+PC:HANDLER          代表异常处理的指针
+</code></pre>
+
+<p>当JVM的方法产生异常后，按照以下步骤执行异常处理：
+1. JVM会在当前Frame的Exception Table里面逐条查找PC范围和异常类型匹配的记录。
+并将PC跳转到对应的异常处理的位置上。
+注意：类型符合不是完全匹配，而是符合向上原则，即父类的catch可以捕获子类的对象,即 e instance of CLASS。
+2. 如果当前Frame不存在Exception Table, 或者在Exception Table里找不到匹配的记录，则当前Frame出栈，把当前Frame设置成上一个Frame，获得新的当前pc和当前异常表。
+3. 继续执行1，直到JAVA STACK到达栈底还不能匹配，则异常未处理，抛出到JRE。</p>
+
+<p>个人理解：JVM是基于所谓的栈帧的(stack frame)的，一个函数调用链就是一个个栈帧组成，当在一个栈里用athrow抛出异常时，JVM会搜索当前函数的异常处理表（参考下面的Class文件分析），如果有找到对应的异常处理的handler，则由这个handler来处理。如果没有，则清理当前栈，再回到上一层栈帧中处理。如果一层层栈帧回退，最
+athrow指令：
+在JVM里实现异常的指令是athrow，指令的参考在这里：<a href="http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-6.html#jvms-6.5.athrow">http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-6.html#jvms-6.5.athrow</a>
+终都没有找到Exception Handler，则线程终止。</p>
+
+<h2>8.    带finally的异常处理</h2>
+
+<p>如果异常处理带有finally块，字节码的处理同上面的异常处理流程一致，
+JVM并不需要为此机制作出改动。编译器通过内联函数和扩展异常表来实现的这个过程。
+可以这么理解finally，有异常发生的时候，可以理解为一个可以捕获方法内任何异常（包含try块中的异常和catch块中的异常）并自动重新抛出的catch段。
+在没有异常，或者异常被捕获的过程，以字节码内联的方式将finally段内容自动添加到对应的段后，然后自动执行。
+注意：如果finally段内如果有return关键字的话，异常已经被捕获，在再次抛出之前，return导致了Frame的出栈，从而导致后面的(athrow)没有执行，JVM的异常状态神奇的消失了。所以在代码实现上面，一定要避免这种有违异常约定的写法（eclipse也会提醒）。</p>
+]]></content>
+  </entry>
   
 </feed>
