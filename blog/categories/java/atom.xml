@@ -4,7 +4,7 @@
   <title><![CDATA[Category: Java | CRO-成都学习天地]]></title>
   <link href="http://crochengdu.github.io/blog/categories/java/atom.xml" rel="self"/>
   <link href="http://crochengdu.github.io/"/>
-  <updated>2014-06-09T13:20:19+08:00</updated>
+  <updated>2014-06-23T12:28:52+08:00</updated>
   <id>http://crochengdu.github.io/</id>
   <author>
     <name><![CDATA[运营支撑团队]]></name>
@@ -12,6 +12,270 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[JUC基础及进阶]]></title>
+    <link href="http://crochengdu.github.io/blog/2014/06/22/juc-basic/"/>
+    <updated>2014-06-22T18:59:40+08:00</updated>
+    <id>http://crochengdu.github.io/blog/2014/06/22/juc-basic</id>
+    <content type="html"><![CDATA[<p>这是介绍Java Util Concurrent一系列文章的第一篇，会给大家带来的是一些并发的基础知识，同时我们会介绍一个无锁的高并发框架LMAX Disruptor。</p>
+
+<h1>概念及应用场景</h1>
+
+<h2>并发与并行</h2>
+
+<ul>
+<li>并发 (Concurrency) 一个处理器“同时”处理多个任务，时间片划分，一个时刻只处理一个任务</li>
+<li>并行 (Parallelism) 多个处理器 “同时”处理多个任务
+<img class="center" src="/images/juc-images/concurrentcy_parallelism.png"></li>
+</ul>
+
+
+<h2>并发编程的应用场景：</h2>
+
+<p>通常在如下两种场景中我们会使用到并发编程。</p>
+
+<ul>
+<li>高并发请求的online应用</li>
+<li>大数据量和计算量（CPU型）的offline应用</li>
+</ul>
+
+
+<h1>几个知识点</h1>
+
+<p>在并发编程中，我们需要处理两个关键问题：线程之间如何通信及线程之间如何同步。首先我们先了解java并发的几个知识点。</p>
+
+<h2>内存模型</h2>
+
+<p>按照编译原理的观点， 程序运行时的内存分配有三种策略， 分别是静态的，栈式的，和堆式的，jvm也是这样的。如下图
+<img class="center" src="/images/juc-images/Java-Memory-Model-1.png">
+如何保证多个线程操作主内存的数据完整性是一个难题，Java内存模型也规定了工作内存与主内存之间交互的协议，首先是定义了8种原子操作：</p>
+
+<ul>
+<li>lock:将主内存中的变量锁定，为一个线程所独占</li>
+<li>unclock:将lock加的锁定解除，此时其它的线程可以有机会访问此变量</li>
+<li>read:将主内存中的变量值读到工作内存当中</li>
+<li>load:将read读取的值保存到工作内存中的变量副本中。</li>
+<li>use:将值传递给线程的代码执行引擎</li>
+<li>assign:将执行引擎处理返回的值重新赋值给变量副本</li>
+<li>store:将变量副本的值存储到主内存中。</li>
+<li>write:将store存储的值写入到主内存的共享变量当中。</li>
+</ul>
+
+
+<h2>重排</h2>
+
+<p>指令重排，就是指指令执行顺序可能会与代码的顺序不一致，为什么需要指令重排，指令重排意义在于： JVM能够根据处理器的特征(CPU的多级缓存系统) 适当的重新排列机器指令，使得机器指令更符合CPU的执行特点，最大限度的发挥机器的性能。</p>
+
+<ol>
+<li>编译器优化的重排序。编译器在不改变单线程程序语义的前提下，可以重新安排语句的执行顺序。</li>
+<li>指令级并行的重排序。现代处理器采用了指令级并行技术（Instruction-Level Parallelism， ILP）来将多条指令重叠执行。如果不存在数据依赖性，处理器可以改变语句对应机器指令的执行顺序。</li>
+<li>内存系统的重排序。由于处理器使用缓存和读/写缓冲区，这使得加载和存储操作看上去可能是在乱序执行。</li>
+</ol>
+
+
+<p><img class="center" src="/images/juc-images/Java-resort.png"></p>
+
+<p>上述的1属于编译器重排序，2和3属于处理器重排序。这些重排序都可能会导致多线程程序出现内存可见性问题。
+就算指令重排了，我们也要利用一些原则来保证某些事件之间的关系，这样才让我们实现线程安全。这就是Happen-before原则
+happens-before规则如下：</p>
+
+<ul>
+<li>程序顺序规则：一个线程中的每个操作，happens- before 于该线程中的任意后续操作。</li>
+<li>监视器锁规则：对一个监视器锁的解锁，happens- before 于随后对这个监视器锁的加锁。</li>
+<li>volatile变量规则：对一个volatile域的写，happens- before 于任意后续对这个volatile域的读。</li>
+<li>传递性：如果A happens- before B，且B happens- before C，那么A happens- before C。
+ Java通过提供以下工具来实现Happens-before原则
+ synchronized, volatile, final, java.util.concurrent</li>
+</ul>
+
+
+<h2>内存屏蔽</h2>
+
+<p>JMM的编译器重排序规则会禁止特定类型的编译器重排序（不是所有的编译器重排序都要禁止）。对于处理器重排序，JMM的处理器重排序规则会要求java编译器在生成指令序列时，插入特定类型的内存屏障（memory barriers，intel称之为memory fence）指令，通过内存屏障指令来禁止特定类型的处理器重排序（不是所有的处理器重排序都要禁止）。
+处理器为什么会重排？Cpu指令执行效率，CPU访问主存的效率比访问cpu缓存的效率低太多。如下java参数可限制CPU指令重排。
+Java  -XX:+UnlockDiagnosticVMOptions
+-XX:PrintAssemblyOptions=hsdis-print-bytes -XX:CompileCommand=print,WriterReader.write WriterReader</p>
+
+<h2>锁概念</h2>
+
+<p>1）悲观锁</p>
+
+<p><img class="center" src="/images/juc-images/Java-lock-1.png">
+只要线程２一获得Entry 的互斥锁，它就会阻击其它线程去改变它，然后它就可以随意做它要做的事情，设置值，然后做其它事情。</p>
+
+<p>2）乐观锁
+<img class="center" src="/images/juc-images/Java-lock-2.png">
+在这种情况，当线程２需要去写Entry时才会去锁定它．它需要检查Entry自从上次读过后是否已经被改过了。如果线程１在线程２读完后到达并把值改为”blah”,线程２读到了这个新值，线程２不会把＂fluffy＂写到Entry里并把线程１所写的数据覆盖．线程２会重试（重新读新的值，与旧值比较，如果相等则在变量的值后面附上’y’）</p>
+
+<h1>JUC介绍</h1>
+
+<h2>volatile实现</h2>
+
+<p>volatile较轻量的同步，锁提供了两种主要特性：互斥（mutual exclusion） 和可见性（visibility），volatile只保证变量可见性，但无法保证原子性</p>
+
+<ul>
+<li><p>[可见性]：对一个volatile变量的读，总是能看到（任意线程）对这个volatile变量最后的写入。</p></li>
+<li><p>[原子性]：对任意单个volatile变量的读/写具有原子性，但类似于volatile++这种复合操作不具有原子性。
+volatile的内存语义</p></li>
+<li><p>volatile写：当写一个volatile变量时，JMM会把该线程对应的本地内存中的共享变量刷新到主内存。</p></li>
+<li><p>volatile读：当读一个volatile变量时，JMM会把该线程对应的本地内存置为无效。线程接下来将从主内存中读取共享变量。</p></li>
+</ul>
+
+
+<p>问题：volatile变量在各个线程中是一致的，所以基于volatile变量的运算在并发下是安全的。这句话是否正确？为什么？</p>
+
+<p>使用volatile的场景必须符合以下两个原则：
+1）运算结果并不依赖变量的当前值，或者能够确保只有单一的线程修改变量的值。
+2）变量不需要与其他的状态变量共同参与不变的约束。</p>
+
+<h2>CAS（Compare and Swap）</h2>
+
+<p>无锁的数据结构的基础：Compare and Swap现在所有的CPU指令都支持CAS的原子操作，X86对应的指令是CMPXCHG汇编指令。CAS是一组原子指令来达到同步的目的，它去拿一个值跟内存中一个值进行比较，只有相等的情况，才会给这个内存的值赋予新的值。整个操作都在一个原子操作内完成的。CAS操作比锁消耗资源少的多，因为它们不牵涉操作系统，它们直接在CPU上操作。
+<img class="center" src="/images/juc-images/Java-lock-cas.png"></p>
+
+<p>CAS虽然很高效的解决原子操作，但是CAS仍然存在三大问题。ABA问题，循环时间长开销大和只能保证一个共享变量的原子操作</p>
+
+<ol>
+<li><p>ABA问题。从Java1.5开始JDK的atomic包里提供了一个类AtomicStampedReference来解决ABA问题。这个类的compareAndSet方法作用是首先检查当前引用是否等于预期引用，并且当前标志是否等于预期标志，如果全部相等，则以原子方式将该引用和该标志的值设置为给定的更新值。</p></li>
+<li><p>循环时间长开销大。自旋CAS如果长时间不成功，会给CPU带来非常大的执行开销。如果JVM能支持处理器提供的pause指令那么效率会有一定的提升，pause指令有两个作用，第一它可以延迟流水线执行指令（de-pipeline）,使CPU不会消耗过多的执行资源，延迟的时间取决于具体实现的版本，在一些处理器上延迟时间是零。第二它可以避免在退出循环的时候因内存顺序冲突（memory order violation）而引起CPU流水线被清空（CPU pipeline flush），从而提高CPU的执行效率。</p></li>
+<li><p>只能保证一个共享变量的原子操作。当对一个共享变量执行操作时，我们可以使用循环CAS的方式来保证原子操作，但是对多个共享变量操作时，循环CAS就无法保证操作的原子性，这个时候就可以用锁，或者有一个取巧的办法，就是把多个共享变量合并成一个共享变量来操作。比如有两个共享变量i＝2,j=a，合并一下ij=2a，然后用CAS来操作ij。从Java1.5开始JDK提供了AtomicReference类来保证引用对象之间的原子性，你可以把多个变量放在一个对象里来进行CAS操作。</p></li>
+</ol>
+
+
+<h2>线程池（ThreadPoolExecutor）</h2>
+
+<p>ThreadPoolExecutor是JDK中提供的线程池，其声明如下：</p>
+
+<p>```java
+public ThreadPoolExecutor(int corePoolSize,</p>
+
+<pre><code>                          int maximumPoolSize,
+                          long keepAliveTime,
+                          TimeUnit unit,
+                          BlockingQueue&lt;Runnable&gt; workQueue,
+                          ThreadFactory threadFactory,
+                          RejectedExecutionHandler handler) 
+</code></pre>
+
+<p>```</p>
+
+<ul>
+<li>corePoolSize：线程池里应该保留的线程数</li>
+<li><p>maximumPoolSize：线程池里允许的最大线程数
+如下线程池增加线程的实现逻辑：如下图：
+<img class="center" src="/images/juc-images/java-juc-threadpool.jpg"></p></li>
+<li><p>worker线程小于corePoolSize, 新增一个worker线程，新task在新线程里运行</p></li>
+<li><p>worker线程大于等于corePoolSize， 新task放入workQueue。同时检测worker线程为0时，增加一个worker线程检测executor状态，STOP时，移除新增任务，调用检测饱和策略处理。</p></li>
+<li><p>上面都失败的情况下，worker线程小于maximumPoolSize时，直接新增一个worker线程运行task，失败后调用饱和策略处理。
+饱和策略是上面ThreadPoolExecutor声明中的RejectedExecutionHandler对象，如下是JDK提供的饱和策略。</p></li>
+<li><p>AbortPolicy（默认）:中止,executor抛出未检查RejectedExecutionException，调用者捕获这个异常，然后自己编写能满足自己需求的处理代码。</p></li>
+<li>DiscardOldestPolicy:遗弃最旧的，选择丢弃的任务，是本应接下来就执行的任务。</li>
+<li>DiscardPolicy:遗弃会默认放弃最新提交的任务（这个任务不能进入队列等待执行时）</li>
+<li>CallerRunsPolicy：调用者运行，既不会丢弃哪个任务，也不会抛出任何异常，把一些任务推回到调用者那里，以此减缓新任务流。它不会在池线程中执行最新提交的任务，但它会在一个调用了execute的线程中执行。</li>
+</ul>
+
+
+<h2>CyclicBarrier</h2>
+
+<p>CyclicBarrier是juc中应用比较多的一个工具类。所谓工具类，是对外屏蔽了一些内部实现细节，可以被用户直接使用达到线程同步的目的。我们可以通过分析源码看看cyclicbarrier是怎么工作来让多线程协调工作。</p>
+
+<p>1)  类的成员变量以及各自作用
+<img class="center" src="/images/juc-images/java-cyclicBarrier-1.png"></p>
+
+<p>2)  核心函数await如何工作。第一段：
+<img class="center" src="/images/juc-images/java-cyclicBarrier-2.png"></p>
+
+<p>lock.lock()到底干了什么事情？</p>
+
+<p><img class="center" src="/images/juc-images/java-cyclicBarrier-3.png">
+lock是一个reetrantlock，是独占锁。独占锁的特征是，lock被thread0锁定之后，其他线程，包括同为“beginning”的线程，都无法获取到锁。Reetrantlock实际上是委托类中的非公平锁。非公平锁首先通过CAS设置AQS独占线程而持有锁：
+% img center /images/juc-images/java-cyclicBarrier-4.png %}</p>
+
+<p>acquire:</p>
+
+<p><img class="center" src="/images/juc-images/java-cyclicBarrier-5.png"></p>
+
+<p>如果tryAcquire(arg)成功，那就没有问题，已经拿到锁，整个lock()过程就结束了。前面已经强调Lock是独占的，那么如果此时thread1-beginning这个线程进来之后，发现无法tryacquire，那如何处理？</p>
+
+<p>如果无法获取到锁，则创建一个独占节点Node，加入CHL队列。CHL是一个非常重要的概念。
+<img class="center" src="/images/juc-images/java-cyclicBarrier-6.png"></p>
+
+<p>那么这个CHL队列是如何起作用？看unlock的过程就明白了。核心函数await核心函数await如何工作，第二段
+<img class="center" src="/images/juc-images/java-cyclicBarrier-7.png"></p>
+
+<p>看看nextGeneration在做什么：
+<img class="center" src="/images/juc-images/java-cyclicBarrier-8.png"></p>
+
+<p>需要是仍然只有一个线程能够拿到锁，其它没有拿到锁的线程仍然需要自旋等待，就上上面提到的第4步(acquireQueued)
+1)  核心函数await如何工作，第三段
+<img class="center" src="/images/juc-images/java-cyclicBarrier-9.png"></p>
+
+<p>这个trip.await()到底是要干神马事情？我们注意第一段，thread1-beginning还在那里自旋等待锁的获取，那么这里await的实现逻辑，就是让当前获取锁的线程park住并把锁释放出来，让在那里自旋的兄弟们解解渴。
+那么什么时候会受到signal的信号呢？</p>
+
+<p>2)  核心函数await如何工作，第三段
+<img class="center" src="/images/juc-images/java-cyclicBarrier-10.png"></p>
+
+<p>Signal只是唤醒当前线程往下走，那么其他在那里自旋的兄弟们怎么办呢？这里我们又要看到AQS的那个队列，此时，unlock将从唤醒下一个节点从Condition的await中出来，然后往下走。
+<img class="center" src="/images/juc-images/java-cyclicBarrier-11.png"></p>
+
+<p>总结一下，3点控制线程同步：
+1)  原子性操作同步器的状态位</p>
+
+<p>2)  阻塞和唤醒线程一个有序的队列</p>
+
+<p>3)  一个有序的队列</p>
+
+<h1>LMX Disruptor</h1>
+
+<h2>锁技术是慢的</h2>
+
+<p>关于锁就是它们需要操作系统去做裁定。线程就像两姐妹在为一个玩具在争吵，然后操作系统就是能决定他们谁能拿到玩具的父母，就像当你跑向你父亲告诉他你的姐姐在你玩着的时候抢走了你的变形金刚－他还有比你们争吵更大的事情去担心，他或许在解决你们争吵之前要启动洗碗机并把它摆在洗衣房里。Disruptor论文中讲述了我们所做的一个实验。这个测试程序调用了一个函数，该函数会对一个64位的计数器循环自增5亿次。当单线程无锁时，程序耗时300ms。如果增加一个锁（仍是单线程、没有竞争、仅仅增加锁），程序需要耗时10000ms，慢了两个数量级。更令人吃惊的是，如果增加一个线程（简单从逻辑上想，应该比单线程加锁快一倍），耗时224000ms。使用两个线程对计数器自增5亿次比使用无锁单线程慢1000倍。并发很难而锁的性能糟糕。</p>
+
+<h2>LMX Disruptor介绍</h2>
+
+<p>LMX Diruptor是一个性能极其良好的一个高并发的框架。他如何提高高并发情况下的性能呢？</p>
+
+<h3>无锁</h3>
+
+<p>首先，Disruptor根本就不用锁。取而代之的是，在需要确保操作是线程安全的（特别是，在多生产者的环境下，更新下一个可用的序列号）地方，我们使用CAS（Compare And Swap/Set）操作</p>
+
+<h3>去掉伪共享</h3>
+
+<p>1)  CPU及缓存介绍</p>
+
+<p>CPU是你机器的心脏，最终由它来执行所有运算和程序。主内存（RAM）是你的数据（包括代码行）存放的地方。CPU和主内存之间有好几层缓存，因为即使直接访问主内存也是非常慢的。如果你正在多次对一块数据做相同的运算，那么在执行运算的时候把它加载到离CPU很近的地方就有意义了（比如一个循环计数－你不想每次循环都跑到主内存去取这个数据来增长它吧）。
+<img class="center" src="/images/juc-images/java-disruptor-1.png">
+越靠近CPU的缓存越快也越小。所以L1缓存很小但很快(译注：L1表示一级缓存)，并且紧靠着在使用它的CPU内核。L2大一些，也慢一些，并且仍然只能被一个单独的 CPU 核使用。L3在现代多核机器中更普遍，仍然更大，更慢，并且被单个插槽上的所有 CPU 核共享。最后，你拥有一块主存，由全部插槽上的所有 CPU 核共享。
+当CPU执行运算的时候，它先去L1查找所需的数据，再去L2，然后是L3，最后如果这些缓存中都没有，所需的数据就要去主内存拿。走得越远，运算耗费的时间就越长。</p>
+
+<p>2)  缓存行</p>
+
+<p>现在需要注意一件有趣的事情，数据在缓存中不是以独立的项来存储的，如不是一个单独的变量，也不是一个单独的指针。缓存是由缓存行组成的，通常是64字节（译注：这篇文章发表时常用处理器的缓存行是64字节的，比较旧的处理器缓存行是32字节），并且它有效地引用主内存中的一块地址。一个Java的long类型是8字节，因此在一个缓存行中可以存8个long类型的变量。
+ <img class="center" src="/images/juc-images/java-disruptor-2.png">
+(为了简化，我将忽略多级缓存)</p>
+
+<p>非常奇妙的是如果你访问一个long数组，当数组中的一个值被加载到缓存中，它会额外加载另外7个。因此你能非常快地遍历这个数组。事实上，你可以非常快速的遍历在连续的内存块中分配的任意数据结构。我在第一篇关于ring buffer的文章中顺便提到过这个，它解释了我们的ring buffer使用数组的原因。
+因此如果你数据结构中的项在内存中不是彼此相邻的（链表，我正在关注你呢），你将得不到免费缓存加载所带来的优势。并且在这些数据结构中的每一个项都可能会出现缓存未命中。
+不过，所有这种免费加载有一个弊端。设想你的long类型的数据不是数组的一部分。设想它只是一个单独的变量。让我们称它为head，这么称呼它其实没有什么原因。然后再设想在你的类中有另一个变量紧挨着它。让我们直接称它为tail。现在，当你加载head到缓存的时候，你也免费加载了tail。</p>
+
+<p><img class="center" src="/images/juc-images/java-disruptor-3.png">
+听想来不错。直到你意识到tail正在被你的生产者写入，而head正在被你的消费者写入。这两个变量实际上并不是密切相关的，而事实上却要被两个不同内核中运行的线程所使用。</p>
+
+<p><img class="center" src="/images/juc-images/java-disruptor-4.png">
+设想你的消费者更新了head的值。缓存中的值和内存中的值都被更新了，而其他所有存储head的缓存行都会都会失效，因为其它缓存中head不是最新值了。请记住我们必须以整个缓存行作为单位来处理（译注：这是CPU的实现所规定的，详细可参见深入分析Volatile的实现原理），不能只把head标记为无效。</p>
+
+<p><img class="center" src="/images/juc-images/java-disruptor-5.png">
+现在如果一些正在其他内核中运行的进程只是想读tail的值，整个缓存行需要从主内存重新读取。那么一个和你的消费者无关的线程读一个和head无关的值，它被缓存未命中给拖慢了。
+当然如果两个独立的线程同时写两个不同的值会更糟。因为每次线程对缓存行进行写操作时，每个内核都要把另一个内核上的缓存块无效掉并重新读取里面的数据。你基本上是遇到两个线程之间的写冲突了，尽管它们写入的是不同的变量。
+这叫作“伪共享”（译注：可以理解为错误的共享），因为每次你访问head你也会得到tail，而且每次你访问tail，你也会得到head。这一切都在后台发生，并且没有任何编译警告会告诉你，你正在写一个并发访问效率很低的代码。</p>
+
+<h1>Summary</h1>
+
+<p>这篇blog主要是为大家带来concurrency的含义，以及它的好处，和相应的问题，同时介绍了LMAX Disruptor相关知识，后面我们会对其做进一步介绍。</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[关于Java异常的那些事儿]]></title>
