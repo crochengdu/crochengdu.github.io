@@ -1,0 +1,527 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>JAVA AQS 解密 - CRO-成都学习天地</title>
+  <meta name="author" content="运营支撑团队">
+
+  
+  <meta name="description" content="JAVA AQS 实现细节 AQS(AbstractQueuedSynchronizer)是java lock的实现基础，如下类图描述，juc的很多实现都依赖AQS。AQS确实比较复杂，
+所有不同锁的每个细节难以描述清楚， &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://crochengdu.github.io/blog/2014/07/08/aqs-wait-notify">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/atom.xml" rel="alternate" title="CRO-成都学习天地" type="application/atom+xml">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+  <script>!window.jQuery && document.write(unescape('%3Cscript src="./javascripts/libs/jquery.min.js"%3E%3C/script%3E'))</script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="//fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="//fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+
+  
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">CRO-成都学习天地</a></h1>
+  
+    <h2>运营支撑团队</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="https://www.google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:crochengdu.github.io" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">JAVA AQS 解密</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-07-08T19:42:36+08:00" pubdate data-updated="true">Jul 8<span>th</span>, 2014</time>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><h1>JAVA AQS 实现细节</h1>
+
+<p>AQS(AbstractQueuedSynchronizer)是java lock的实现基础，如下类图描述，juc的很多实现都依赖AQS。AQS确实比较复杂，
+所有不同锁的每个细节难以描述清楚，所以本文的重点是使用ReentrantLock作为例子只分析NonfairSync和condition的实现原理，
+其它锁的实现原理都是以此作为基础进行扩展和优化。</p>
+
+<p><img class="center" src="/images/aqs/aqs-class.png"></p>
+
+<h1>从Lock的一段简单代码开始</h1>
+
+<p>就以下面一段我们经常使用的简单代码作为例子，例子中就是使用Lock和Condition实现线程安全的生产者-消费者模型，借助这个简单的例子，
+我们一步步分析一下Lock内部是如何实现线程同步的。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+<span class='line-number'>67</span>
+<span class='line-number'>68</span>
+<span class='line-number'>69</span>
+<span class='line-number'>70</span>
+<span class='line-number'>71</span>
+<span class='line-number'>72</span>
+<span class='line-number'>73</span>
+<span class='line-number'>74</span>
+<span class='line-number'>75</span>
+<span class='line-number'>76</span>
+<span class='line-number'>77</span>
+<span class='line-number'>78</span>
+<span class='line-number'>79</span>
+<span class='line-number'>80</span>
+<span class='line-number'>81</span>
+<span class='line-number'>82</span>
+<span class='line-number'>83</span>
+<span class='line-number'>84</span>
+<span class='line-number'>85</span>
+<span class='line-number'>86</span>
+<span class='line-number'>87</span>
+<span class='line-number'>88</span>
+<span class='line-number'>89</span>
+<span class='line-number'>90</span>
+<span class='line-number'>91</span>
+<span class='line-number'>92</span>
+<span class='line-number'>93</span>
+<span class='line-number'>94</span>
+<span class='line-number'>95</span>
+<span class='line-number'>96</span>
+<span class='line-number'>97</span>
+<span class='line-number'>98</span>
+<span class='line-number'>99</span>
+<span class='line-number'>100</span>
+<span class='line-number'>101</span>
+<span class='line-number'>102</span>
+<span class='line-number'>103</span>
+</pre></td><td class='code'><pre><code class='java'><span class='line'> 
+</span><span class='line'>  <span class="kn">import</span> <span class="nn">java.util.concurrent.locks.Condition</span><span class="o">;</span>
+</span><span class='line'>  <span class="kn">import</span> <span class="nn">java.util.concurrent.locks.Lock</span><span class="o">;</span>
+</span><span class='line'>  <span class="kn">import</span> <span class="nn">java.util.concurrent.locks.ReentrantLock</span><span class="o">;</span>
+</span><span class='line'>  
+</span><span class='line'><span class="kd">public</span> <span class="kd">class</span> <span class="nc">ProductQueue</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;</span> <span class="o">{</span>
+</span><span class='line'>
+</span><span class='line'><span class="kd">private</span> <span class="n">T</span><span class="o">[]</span>       <span class="n">items</span><span class="o">;</span>
+</span><span class='line'><span class="kd">private</span> <span class="n">Lock</span>      <span class="n">lock</span>         <span class="o">=</span> <span class="k">new</span> <span class="n">ReentrantLock</span><span class="o">();</span>
+</span><span class='line'><span class="kd">final</span> <span class="kd">static</span> <span class="kt">int</span>  <span class="n">DEAFULT_SIZE</span> <span class="o">=</span> <span class="mi">10</span><span class="o">;</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">//满队列条件</span>
+</span><span class='line'><span class="kd">private</span> <span class="n">Condition</span> <span class="n">notFull</span>      <span class="o">=</span> <span class="n">lock</span><span class="o">.</span><span class="na">newCondition</span><span class="o">();</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">//空队列条件</span>
+</span><span class='line'><span class="kd">private</span> <span class="n">Condition</span> <span class="n">notEmpty</span>     <span class="o">=</span> <span class="n">lock</span><span class="o">.</span><span class="na">newCondition</span><span class="o">();</span>
+</span><span class='line'>
+</span><span class='line'><span class="kd">private</span> <span class="kt">int</span>       <span class="n">head</span><span class="o">,</span> <span class="n">tail</span><span class="o">,</span> <span class="n">count</span><span class="o">;</span>
+</span><span class='line'>
+</span><span class='line'><span class="nd">@SuppressWarnings</span><span class="o">(</span><span class="s">&quot;unchecked&quot;</span><span class="o">)</span>
+</span><span class='line'><span class="kd">public</span> <span class="nf">ProductQueue</span><span class="o">(</span><span class="kt">int</span> <span class="n">size</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>    <span class="n">items</span> <span class="o">=</span> <span class="o">(</span><span class="n">T</span><span class="o">[])</span> <span class="k">new</span> <span class="n">Object</span><span class="o">[</span><span class="n">size</span><span class="o">];</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="kd">public</span> <span class="nf">ProductQueue</span><span class="o">()</span> <span class="o">{</span>
+</span><span class='line'>    <span class="k">this</span><span class="o">(</span><span class="n">DEAFULT_SIZE</span><span class="o">);</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="cm">/**</span>
+</span><span class='line'><span class="cm"> * 生产产品</span>
+</span><span class='line'><span class="cm"> * </span>
+</span><span class='line'><span class="cm"> * @param t</span>
+</span><span class='line'><span class="cm"> * @throws InterruptedException</span>
+</span><span class='line'><span class="cm"> */</span>
+</span><span class='line'><span class="kd">public</span> <span class="kt">void</span> <span class="nf">put</span><span class="o">(</span><span class="n">T</span> <span class="n">t</span><span class="o">)</span> <span class="kd">throws</span> <span class="n">InterruptedException</span> <span class="o">{</span>
+</span><span class='line'>    <span class="n">lock</span><span class="o">.</span><span class="na">lock</span><span class="o">();</span><span class="c1">//获取独占锁</span>
+</span><span class='line'>    <span class="k">try</span> <span class="o">{</span>
+</span><span class='line'>        <span class="n">Thread</span><span class="o">.</span><span class="na">sleep</span><span class="o">(</span><span class="mi">2</span> <span class="o">*</span> <span class="mi">1000</span><span class="o">);</span>
+</span><span class='line'>        <span class="k">while</span> <span class="o">(</span><span class="n">count</span> <span class="o">==</span> <span class="n">getCapacity</span><span class="o">())</span> <span class="o">{</span><span class="c1">//队列已满，挂起当前 线程，将当前线程加入条件锁队列中，直到收到队列不为满的信号，从队列中按照FIFO唤醒一个线程</span>
+</span><span class='line'>            <span class="n">notFull</span><span class="o">.</span><span class="na">await</span><span class="o">();</span> <span class="c1">//释放独占锁 ，让其他线程（消费者线程）获取，然后挂起当前线程，一旦后续条件满足，再次获取锁</span>
+</span><span class='line'>        <span class="o">}</span>
+</span><span class='line'>        <span class="n">items</span><span class="o">[</span><span class="n">tail</span><span class="o">]</span> <span class="o">=</span> <span class="n">t</span><span class="o">;</span>
+</span><span class='line'>        <span class="k">if</span> <span class="o">(++</span><span class="n">tail</span> <span class="o">==</span> <span class="n">getCapacity</span><span class="o">())</span> <span class="o">{</span>
+</span><span class='line'>            <span class="n">tail</span> <span class="o">=</span> <span class="mi">0</span><span class="o">;</span>
+</span><span class='line'>        <span class="o">}</span>
+</span><span class='line'>        <span class="o">++</span><span class="n">count</span><span class="o">;</span>
+</span><span class='line'>        <span class="n">notEmpty</span><span class="o">.</span><span class="na">signalAll</span><span class="o">();</span><span class="c1">//队列已不为空，可以唤醒消费者 消费产品</span>
+</span><span class='line'>    <span class="o">}</span> <span class="k">finally</span> <span class="o">{</span>
+</span><span class='line'>        <span class="n">lock</span><span class="o">.</span><span class="na">unlock</span><span class="o">();</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="cm">/**</span>
+</span><span class='line'><span class="cm"> * 消费产品</span>
+</span><span class='line'><span class="cm"> * </span>
+</span><span class='line'><span class="cm"> * @return</span>
+</span><span class='line'><span class="cm"> * @throws InterruptedException</span>
+</span><span class='line'><span class="cm"> */</span>
+</span><span class='line'><span class="kd">public</span> <span class="n">T</span> <span class="nf">get</span><span class="o">()</span> <span class="kd">throws</span> <span class="n">InterruptedException</span> <span class="o">{</span>
+</span><span class='line'>    <span class="n">lock</span><span class="o">.</span><span class="na">lock</span><span class="o">();</span>
+</span><span class='line'>    <span class="k">try</span> <span class="o">{</span>
+</span><span class='line'>        <span class="k">while</span> <span class="o">(</span><span class="n">count</span> <span class="o">==</span> <span class="mi">0</span><span class="o">)</span> <span class="o">{</span><span class="c1">//队列已空，挂起空队列锁条件 线程，直到收到不为空的信号，被唤醒</span>
+</span><span class='line'>            <span class="n">notEmpty</span><span class="o">.</span><span class="na">await</span><span class="o">();</span>
+</span><span class='line'>        <span class="o">}</span>
+</span><span class='line'>        <span class="n">T</span> <span class="n">ret</span> <span class="o">=</span> <span class="n">items</span><span class="o">[</span><span class="n">head</span><span class="o">];</span>
+</span><span class='line'>        <span class="n">items</span><span class="o">[</span><span class="n">head</span><span class="o">]</span> <span class="o">=</span> <span class="kc">null</span><span class="o">;</span>
+</span><span class='line'>        <span class="k">if</span> <span class="o">(++</span><span class="n">head</span> <span class="o">==</span> <span class="n">getCapacity</span><span class="o">())</span> <span class="o">{</span>
+</span><span class='line'>            <span class="n">head</span> <span class="o">=</span> <span class="mi">0</span><span class="o">;</span>
+</span><span class='line'>        <span class="o">}</span>
+</span><span class='line'>        <span class="o">--</span><span class="n">count</span><span class="o">;</span>
+</span><span class='line'>        <span class="n">notFull</span><span class="o">.</span><span class="na">signalAll</span><span class="o">();</span><span class="c1">//队列已不为满，可以唤醒生产者  生产产品</span>
+</span><span class='line'>        <span class="k">return</span> <span class="n">ret</span><span class="o">;</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="o">}</span> <span class="k">finally</span> <span class="o">{</span>
+</span><span class='line'>        <span class="n">lock</span><span class="o">.</span><span class="na">unlock</span><span class="o">();</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="cm">/**</span>
+</span><span class='line'><span class="cm"> * 产品队列容量</span>
+</span><span class='line'><span class="cm"> * </span>
+</span><span class='line'><span class="cm"> * @return</span>
+</span><span class='line'><span class="cm"> */</span>
+</span><span class='line'><span class="kd">public</span> <span class="kt">int</span> <span class="nf">getCapacity</span><span class="o">()</span> <span class="o">{</span>
+</span><span class='line'>    <span class="k">return</span> <span class="n">items</span><span class="o">.</span><span class="na">length</span><span class="o">;</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="cm">/**</span>
+</span><span class='line'><span class="cm"> * 当前产品数量</span>
+</span><span class='line'><span class="cm"> * </span>
+</span><span class='line'><span class="cm"> * @return</span>
+</span><span class='line'><span class="cm"> */</span>
+</span><span class='line'><span class="kd">public</span> <span class="kt">int</span> <span class="nf">size</span><span class="o">()</span> <span class="o">{</span>
+</span><span class='line'>    <span class="n">lock</span><span class="o">.</span><span class="na">lock</span><span class="o">();</span>
+</span><span class='line'>    <span class="k">try</span> <span class="o">{</span>
+</span><span class='line'>        <span class="k">return</span> <span class="n">count</span><span class="o">;</span>
+</span><span class='line'>    <span class="o">}</span> <span class="k">finally</span> <span class="o">{</span>
+</span><span class='line'>        <span class="n">lock</span><span class="o">.</span><span class="na">unlock</span><span class="o">();</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<h1>AQS基础数据结构</h1>
+
+<p>在开始分析之前，先讲一下AQS实现中的基础数据结构（如下图所示）
+AQS基础数据结构.png</p>
+
+<ul>
+<li>state：32位整数描述的状态位来支持原子操作(volatile+CAS)</li>
+<li>head：有序队列的队头结点，tail：有序队列的队尾结点</li>
+<li>pre：当前节点的前一个结点引用 next:当前节点的下一个节点引用主要用于构建有序队列的双向链表</li>
+<li>thread：当前节点绑定的线程</li>
+<li>waitStatus：当前节点的等待状态</li>
+<li>nextWaiter：当前节点的后继节点，主要结合Condition使用</li>
+<li>firstWaiter：Condition队列的第一个Node</li>
+<li>lastWaiter：Condition队列的最后一个Node，主要用于表示Condition队列的头和尾节点，需要区分AQS队列的head和tail</li>
+</ul>
+
+
+<h1>Lock.lock()</h1>
+
+<p>从Lock的lock方法作为入口讲起，参考下面的处理流程图：</p>
+
+<p><img class="center" src="/images/aqs/lock-workflow.png"></p>
+
+<p>整个加锁执行逻辑：</p>
+
+<ul>
+<li>1.如果tryAcquire(arg)成功，返回true，说明当前线程已经拿到锁，执行当前线程操作，整个lock()过程就结束了。如果失败进行操作2。</li>
+<li>2.创建一个独占节点（同时会新生成一个傀儡头结点）并且将此节点加入CHL队列末尾。进行操作3。</li>
+<li>3.acquireQueued(node,arg),自旋尝试获取锁，如果获取失败，则根据前一个节点来决定是否挂起（park()），不管是否挂起，都会自旋，直到成功获取到锁。如果在自旋的过程中线程被中断过，那么会置线程中断标志,  进行操作4。</li>
+<li>4.如果当前线程已经中断过，那么就中断当前线程（清除中断位）。</li>
+</ul>
+
+
+<h1>Lock.unlock()</h1>
+
+<p><img class="center" src="/images/aqs/unlock-workflow.png"></p>
+
+<p>整个解锁执行逻辑：</p>
+
+<ul>
+<li>1.tryRelease(arg)执行解锁操作，如果锁释放失败或者当前线程没有持有锁，则抛出异常(IllegalMonitorStateException),如果成功，则进行操作2。</li>
+<li>2.获取CHL队列头结点，如果头结点为空或者状态为0，说明CHL队列为空，结束锁释放过程，否则进行操作3。</li>
+<li>3.找到需要唤醒的继任节点，并进行线程唤醒操作（unpark()），同时会维护CHL队列，去除已中断或者超时的节点，结束锁释放过程。</li>
+</ul>
+
+
+<h1>AQS队列</h1>
+
+<p><img class="center" src="/images/aqs/AQS-queue.png"></p>
+
+<p>AQS队列</p>
+
+<ul>
+<li>整个AQS队列为带头结点和尾节点的双向链表，其中的节点主要以waitStatus来表示其状态，并绑定对应的线程。</li>
+<li>AQS队列的头节点为傀儡节点，唤醒的节点为傀儡节点的继任节点，移除节点从队列头节点开始，添加节点从队列尾节点开始，添加时主要以CAS操作保证线程安全。</li>
+<li>AQS队列主要按FIFO来保证节点的执行顺序，以此来达到公平性。</li>
+</ul>
+
+
+<h1>Condition.await()</h1>
+
+<p><img class="center" src="/images/aqs/condit-await.png"></p>
+
+<p>执行逻辑如下：</p>
+
+<ul>
+<li>1.将当前线程加入Condition锁队列。特别说明的是，这里不同于AQS的队列，这里进入的是Condition的FIFO队列。</li>
+<li>2.释放锁，这里可以看到将锁释放了，否则别的线程就无法拿到锁而发生死锁。进行3。</li>
+<li>3.自旋(while)挂起，直到被唤醒或者超时或者CACELLED。进行4。</li>
+<li>4.获取锁(acquireQueued)，并将自己从Condition的FIFO队列中释放，表明自己不再需要锁（我已经拿到锁了）。</li>
+</ul>
+
+
+<h1>Condition.signal()</h1>
+
+<p><img class="center" src="/images/aqs/condition-signal.png"></p>
+
+<p>signal就是唤醒Condition队列中的第一个非CANCELLED节点线程，
+而signalAll就是唤醒所有非CANCELLED节点线程。当然了遇到CANCELLED线程就需要将其从FIFO队列中剔除。</p>
+
+<h1>aqs和condition2个队列</h1>
+
+<p><img class="center" src="/images/aqs/aqs-condition-queue.png"></p>
+
+<p>AQS和Condition队列</p>
+
+<ul>
+<li>以生产者-消费者模型来说，在产品的生成和消费过程中，会维护3个队列，一个AQS队列，一个生产者条件队列，一个消费者条件队列。</li>
+<li>AQS和Condition队列有一定的不同，条件队列为典型的FIFO队列，而AQS带有一定的特性（头结点和继任节点关系）。</li>
+<li>当执行await()会向相应的条件队列中加入条件节点，并进行相应的维护，当执行signal()或者signalAll()时，会将条件队列中的节点维护到AQS中，进行队列间的交互。</li>
+</ul>
+
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">运营支撑团队</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-07-08T19:42:36+08:00" pubdate data-updated="true">Jul 8<span>th</span>, 2014</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/java/'>Java</a>
+  
+</span>
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  <a href="//twitter.com/share" class="twitter-share-button" data-url="http://crochengdu.github.io/blog/2014/07/08/aqs-wait-notify/" data-via="" data-counturl="http://crochengdu.github.io/blog/2014/07/08/aqs-wait-notify/" >Tweet</a>
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2014/06/22/juc-basic/" title="Previous Post: JUC基础及进阶">&laquo; JUC基础及进阶</a>
+      
+      
+    </p>
+  </footer>
+</article>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2014/07/08/aqs-wait-notify/">JAVA AQS 解密</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/06/22/juc-basic/">JUC基础及进阶</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/06/09/java-exception/">关于Java异常的那些事儿</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/06/09/java-collection/">关于Java集合的那些事儿</a>
+      </li>
+    
+  </ul>
+</section>
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2014 - 运营支撑团队 -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+
+
+
+
+
+
+  <script type="text/javascript">
+    (function(){
+      var twitterWidgets = document.createElement('script');
+      twitterWidgets.type = 'text/javascript';
+      twitterWidgets.async = true;
+      twitterWidgets.src = '//platform.twitter.com/widgets.js';
+      document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
+    })();
+  </script>
+
+
+
+
+
+</body>
+</html>
